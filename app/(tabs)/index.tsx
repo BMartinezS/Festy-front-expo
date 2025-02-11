@@ -1,11 +1,35 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import { Image, StyleSheet, Platform, Button } from 'react-native';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import React, { useEffect } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CleanTokenButton } from '@/components/CleanTokenButton';
 
 export default function HomeScreen() {
+
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const checkAuth = async () => {
+        try {
+          const token = await AsyncStorage.getItem('userToken');
+          if (!token) {
+            router.replace('/auth/login');
+          }
+        } catch (error) {
+          console.error('Error checking auth:', error);
+          router.replace('/auth/login');
+        }
+      };
+
+      checkAuth();
+    }, [])
+  );
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -16,7 +40,12 @@ export default function HomeScreen() {
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
+        <Button
+          onPress={() => router.push('/event')}
+          title="Panel de Administración"
+        />
+        <CleanTokenButton></CleanTokenButton>
+        <ThemedText type="title">HOla!</ThemedText>
         <HelloWave />
       </ThemedView>
       <ThemedView style={styles.stepContainer}>
