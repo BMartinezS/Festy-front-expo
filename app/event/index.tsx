@@ -25,6 +25,7 @@ export default function EventsScreen() {
             if (!token) throw new Error('No token found');
 
             const data = await eventService.getEvents(token);
+            console.log('datA: ', data)
             setEvents(data);
             setError('');
         } catch (error: any) {
@@ -63,6 +64,13 @@ export default function EventsScreen() {
         </TouchableOpacity>
     );
 
+    const renderEmptyState = () => (
+        <View style={styles.emptyContainer}>
+            <Text style={styles.emptyTitle}>No hay eventos disponibles</Text>
+            <Text style={styles.emptySubtitle}>¡Crea tu primer evento usando el botón +!</Text>
+        </View>
+    );
+
     return (
         <View style={styles.container}>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -71,11 +79,15 @@ export default function EventsScreen() {
                 data={events}
                 renderItem={renderEventCard}
                 keyExtractor={(item) => item._id}
-                contentContainerStyle={styles.listContainer}
+                contentContainerStyle={[
+                    styles.listContainer,
+                    events.length === 0 && styles.emptyListContainer
+                ]}
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={loadEvents} />
                 }
+                ListEmptyComponent={renderEmptyState}
             />
 
             <TouchableOpacity
@@ -89,6 +101,29 @@ export default function EventsScreen() {
 }
 
 const styles = StyleSheet.create({
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: 'rgb(51, 18, 59)',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        fontSize: 16,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 22,
+    },
+    emptyListContainer: {
+        flex: 1,
+        justifyContent: 'center',
+    },
     container: {
         flex: 1,
         backgroundColor: '#f8f9fa',

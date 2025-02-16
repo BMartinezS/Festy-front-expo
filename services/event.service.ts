@@ -31,6 +31,7 @@ export const eventService = {
                 'Accept': 'application/json',
             },
         });
+
         if (!response.ok) throw new Error('Error al obtener eventos');
         return response.json();
     },

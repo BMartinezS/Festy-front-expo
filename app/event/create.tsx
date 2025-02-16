@@ -12,10 +12,12 @@ import {
     FlatList,
 } from 'react-native';
 import { router } from 'expo-router';
+import CustomDropdown from '@/components/CustomDropdown';
 import { eventService } from '@/services/event.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
+import MapComponent from '@/components/MapComponent';
 
 interface Product {
     externalId: string;
@@ -30,6 +32,7 @@ export default function CreateEventScreen() {
         nombre: '',
         descripcion: '',
         fecha: new Date(),
+        tipo: '', // Añade esto
         ubicacion: {
             coordinates: [0, 0],
             address: '',
@@ -37,6 +40,7 @@ export default function CreateEventScreen() {
         requiresPayment: false,
         cuotaAmount: '0',
         productos: [] as Product[],
+        cantidadInvitados: '0'
     });
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [error, setError] = useState('');
@@ -114,6 +118,10 @@ export default function CreateEventScreen() {
         }
     };
 
+    const eventTypeOptions = [
+        { label: 'Asado', value: 'asado' }
+    ];
+
     const renderListHeader = () => (
         <View style={styles.innerContainer}>
             <Text style={styles.title}>Crear Evento</Text>
@@ -130,6 +138,24 @@ export default function CreateEventScreen() {
                 }
             />
 
+            <CustomDropdown
+                label="Tipo de evento"
+                value={form.tipo}
+                options={eventTypeOptions}
+                onValueChange={(value) => setForm(prev => ({ ...prev, tipo: value }))}
+                placeholder="Selecciona el tipo de evento"
+            />
+
+            <TextInput
+                style={styles.input}
+                keyboardType={Platform.OS !== 'web' ? "numeric" : "number-pad"}
+                placeholder="Cantidad de personas"
+                placeholderTextColor="#666"
+                value={form.cantidadInvitados}
+                onChangeText={(text) =>
+                    setForm(prev => ({ ...prev, nombre: text }))
+                }
+            />
             <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="Descripción"
@@ -152,27 +178,73 @@ export default function CreateEventScreen() {
                 </Text>
             </TouchableOpacity>
 
-            {showDatePicker && (
-                <DateTimePicker
-                    value={form.fecha}
-                    mode="datetime"
-                    display="default"
-                    onChange={handleDateChange}
-                    minimumDate={new Date()}
-                />
+            {Platform.OS === 'web' ? (
+                <View style={styles.dateTimeContainer}>
+                    <View style={styles.dateInputContainer}>
+                        <Text style={styles.dateButtonLabel}>Fecha</Text>
+                        <input
+                            style={styles.dateInput}
+                            type="date"
+                            value={form.fecha.toISOString().split('T')[0]}
+                            onChange={(e) => {
+                                const newDate = new Date(form.fecha);
+                                const [year, month, day] = e.target.value.split('-');
+                                newDate.setFullYear(parseInt(year));
+                                newDate.setMonth(parseInt(month) - 1);
+                                newDate.setDate(parseInt(day));
+                                setForm(prev => ({ ...prev, fecha: newDate }));
+                            }}
+                        />
+                    </View>
+                    <View style={styles.dateInputContainer}>
+                        <Text style={styles.dateButtonLabel}>Hora</Text>
+                        <TouchableOpacity
+                            style={styles.dateInput}
+                            onPress={() => {
+                                const newDate = new Date(form.fecha);
+                                const timeString = prompt("Enter time (HH:MM)", form.fecha.toTimeString().slice(0, 5));
+                                if (timeString) {
+                                    const [hours, minutes] = timeString.split(':');
+                                    newDate.setHours(parseInt(hours));
+                                    newDate.setMinutes(parseInt(minutes));
+                                    setForm(prev => ({ ...prev, fecha: newDate }));
+                                }
+                            }}
+                        >
+                            <Text>{form.fecha.toTimeString().slice(0, 5)}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            ) : (
+                <>
+                    <TouchableOpacity
+                        style={styles.dateButton}
+                        onPress={() => setShowDatePicker(true)}
+                    >
+                        <Text style={styles.dateButtonLabel}>Fecha del evento</Text>
+                        <Text style={styles.dateButtonText}>
+                            {form.fecha.toLocaleDateString()} {form.fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {showDatePicker && (
+                        <DateTimePicker
+                            value={form.fecha}
+                            mode="datetime"
+                            display="default"
+                            onChange={handleDateChange}
+                            minimumDate={new Date()}
+                        />
+                    )}
+                </>
             )}
 
-            <TextInput
-                style={styles.input}
-                placeholder="Dirección"
-                placeholderTextColor="#666"
-                value={form.ubicacion.address}
-                onChangeText={(text) =>
-                    setForm(prev => ({
-                        ...prev,
-                        ubicacion: { ...prev.ubicacion, address: text }
-                    }))
-                }
+            <MapComponent
+                latitude={-33.441622}
+                longitude={-70.654049}
+                onLocationSelect={(lat, lng) => {
+                    console.log(`Selected location: ${lat}, ${lng}`);
+                }}
             />
 
             <View style={styles.switchContainer}>
@@ -309,6 +381,50 @@ export default function CreateEventScreen() {
 }
 
 const styles = StyleSheet.create({
+    mobileMapPlaceholder: {
+        textAlign: 'center',
+        padding: 20,
+        color: '#666',
+    },
+    locationButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgb(51, 18, 59)',
+        padding: 12,
+        borderRadius: 10,
+        marginBottom: 10,
+        gap: 8,
+    },
+    locationButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    dateTimeContainer: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 15,
+    },
+    dateInputContainer: {
+        flex: 1,
+    },
+    dateInput: {
+        height: 50,
+        backgroundColor: '#ffffff',
+        borderRadius: 10,
+        paddingHorizontal: 15,
+        borderWidth: 1,
+        borderColor: 'rgb(71, 25, 82)',
+        color: '#333',
+    },
+    mapContainer: {
+        height: 300,
+        marginBottom: 15,
+        borderRadius: 10,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgb(71, 25, 82)',
+    },
     container: {
         flex: 1,
         backgroundColor: '#f8f9fa',
