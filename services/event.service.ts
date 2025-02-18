@@ -21,6 +21,7 @@ export interface Event {
     status: 'draft' | 'active' | 'cancelled' | 'completed';
     requiresPayment: boolean;
     cuotaAmount?: number;
+    cantidadInvitados?: number;
 }
 
 export const eventService = {
