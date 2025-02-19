@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function EventsScreen() {
     const [events, setEvents] = useState<Event[]>([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     const loadEvents = async () => {
@@ -24,14 +25,23 @@ export default function EventsScreen() {
             const token = await AsyncStorage.getItem('userToken');
             if (!token) throw new Error('No token found');
 
-            const data = await eventService.getEvents(token);
-            console.log('datA: ', data)
+            const datosEvento = await eventService.getEvents(token);
+
+            if ('error' in datosEvento) {
+                setEvents([]);
+                return;
+            }
+
+            const { data } = datosEvento;
+
+            console.log('data: ', data);
             setEvents(data);
             setError('');
         } catch (error: any) {
             setError(error.message || 'Error al cargar eventos');
         } finally {
             setRefreshing(false);
+            setLoading(false);
         }
     };
 
@@ -39,26 +49,30 @@ export default function EventsScreen() {
         loadEvents();
     }, []);
 
-    const renderEventCard = ({ item: event }: { item: Event }) => (
+    const renderEventCard = ({ item: event }: { item: any }) => (
         <TouchableOpacity
             style={styles.card}
             onPress={() => router.push(`/event/${event._id}`)}
         >
             <Text style={styles.cardTitle}>{event.nombre}</Text>
             <Text style={styles.cardDate}>
-                {new Date(event.fecha).toLocaleDateString()}
+                Inicio {new Date(event.fechaInicio).toLocaleDateString()} a las {new Date(event.fechaInicio).toLocaleTimeString()}
             </Text>
             <Text style={styles.cardAddress}>{event.ubicacion.address}</Text>
 
             <View style={styles.cardFooter}>
-                <Text style={[
-                    styles.cardStatus,
-                    event.status === 'active' && styles.activeStatus
-                ]}>
-                    {event.status.toUpperCase()}
-                </Text>
+                <View
+                    style={[
+                        styles.statusContainer,
+                        event.status === 'active' && styles.activeStatusContainer,
+                    ]}
+                >
+                    <Text style={styles.cardStatus}>
+                        {event.status.toUpperCase()}
+                    </Text>
+                </View>
                 <Text style={styles.cardGuests}>
-                    {event.invitados.length} invitados
+                    {event.cantidadInvitados} invitados, confirmados: {event.invitados.length}
                 </Text>
             </View>
         </TouchableOpacity>
@@ -67,7 +81,10 @@ export default function EventsScreen() {
     const renderEmptyState = () => (
         <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>No hay eventos disponibles</Text>
-            <Text style={styles.emptySubtitle}>¡Crea tu primer evento usando el botón +!</Text>
+            <Text style={styles.emptySubtitle}>
+                ¡Crea tu primer evento usando el botón +
+                en la esquina!
+            </Text>
         </View>
     );
 
@@ -75,20 +92,28 @@ export default function EventsScreen() {
         <View style={styles.container}>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <FlatList
-                data={events}
-                renderItem={renderEventCard}
-                keyExtractor={(item) => item._id}
-                contentContainerStyle={[
-                    styles.listContainer,
-                    events.length === 0 && styles.emptyListContainer
-                ]}
-                ItemSeparatorComponent={() => <View style={styles.separator} />}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={loadEvents} />
-                }
-                ListEmptyComponent={renderEmptyState}
-            />
+            {loading ? (
+                <ActivityIndicator
+                    size="large"
+                    color="rgb(51, 18, 59)"
+                    style={styles.loader}
+                />
+            ) : (
+                <FlatList
+                    data={events}
+                    renderItem={renderEventCard}
+                    keyExtractor={(item) => item._id}
+                    contentContainerStyle={[
+                        styles.listContainer,
+                        events.length === 0 && styles.emptyListContainer,
+                    ]}
+                    ItemSeparatorComponent={() => <View style={styles.separator} />}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={loadEvents} />
+                    }
+                    ListEmptyComponent={renderEmptyState}
+                />
+            )}
 
             <TouchableOpacity
                 style={styles.fab}
@@ -101,29 +126,6 @@ export default function EventsScreen() {
 }
 
 const styles = StyleSheet.create({
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-    },
-    emptyTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    emptySubtitle: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: 22,
-    },
-    emptyListContainer: {
-        flex: 1,
-        justifyContent: 'center',
-    },
     container: {
         flex: 1,
         backgroundColor: '#f8f9fa',
@@ -131,12 +133,22 @@ const styles = StyleSheet.create({
     listContainer: {
         padding: 20,
     },
+    emptyListContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     card: {
         backgroundColor: '#ffffff',
         borderRadius: 10,
         padding: 15,
         borderWidth: 1,
         borderColor: 'rgb(71, 25, 82)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
     },
     cardTitle: {
         fontSize: 18,
@@ -160,12 +172,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: 8,
     },
+    statusContainer: {
+        paddingVertical: 2,
+        paddingHorizontal: 8,
+        borderRadius: 4,
+        backgroundColor: '#eee',
+    },
+    activeStatusContainer: {
+        backgroundColor: '#28a745',
+    },
     cardStatus: {
         fontSize: 12,
-        color: '#666',
-    },
-    activeStatus: {
-        color: '#28a745',
+        color: '#fff',
+        fontWeight: 'bold',
     },
     cardGuests: {
         fontSize: 12,
@@ -186,10 +205,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         elevation: 4,
         shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
     },
@@ -203,5 +219,27 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginTop: 20,
         marginHorizontal: 20,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: 'rgb(51, 18, 59)',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        fontSize: 16,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 22,
+    },
+    loader: {
+        marginTop: 50,
     },
 });

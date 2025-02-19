@@ -25,7 +25,7 @@ export interface Event {
 }
 
 export const eventService = {
-    async getEvents(token: string): Promise<Event[]> {
+    async getEvents(token: string): Promise<any> {
         const response = await fetch(`${API_URL}/events`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
