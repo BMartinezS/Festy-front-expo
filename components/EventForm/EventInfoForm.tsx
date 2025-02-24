@@ -1,8 +1,9 @@
-// components/EventInfoForm.tsx
+// components/EventForm/EventInfoForm.tsx
 import React from 'react';
-import { View, TextInput, StyleSheet } from 'react-native';
+import { View, TextInput, Platform, Text } from 'react-native';
 import CustomDropdown from '@/components/CustomDropdown';
 import { EventForm } from './types';
+import { commonStyles } from '@/styles/eventForm';
 
 const EVENT_TYPES = [
     { label: 'Asado', value: 'asado' },
@@ -17,12 +18,14 @@ interface EventInfoFormProps {
 
 const EventInfoForm: React.FC<EventInfoFormProps> = ({ form, updateForm }) => {
     return (
-        <View style={styles.container}>
+        <View style={commonStyles.container}>
+            <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 13, marginBottom: 5 }}>Nombre del evento</Text>
             <TextInput
-                style={styles.input}
+                style={commonStyles.input}
                 placeholder="Nombre del evento"
                 value={form.nombre}
                 onChangeText={(text) => updateForm('nombre', text)}
+                placeholderTextColor="#999"
             />
             <CustomDropdown
                 label="Tipo de evento"
@@ -31,44 +34,27 @@ const EventInfoForm: React.FC<EventInfoFormProps> = ({ form, updateForm }) => {
                 onValueChange={(value) => updateForm('tipo', value)}
                 placeholder="Selecciona el tipo de evento"
             />
+            <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 13, marginBottom: 5 }}>Descripción</Text>
             <TextInput
-                style={styles.input}
-                placeholder="Duración del evento"
-                value={form.duracion}
-                onChangeText={(text) => updateForm('duracion', text)}
-            />
-            <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[commonStyles.input, commonStyles.textArea]}
                 placeholder="Descripción"
                 value={form.descripcion}
                 onChangeText={(text) => updateForm('descripcion', text)}
                 multiline
-                numberOfLines={3}
+                numberOfLines={Platform.OS === 'ios' ? undefined : 3}
+                placeholderTextColor="#999"
             />
+            <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 13, marginBottom: 5 }}>Cantidad de invitados</Text>
             <TextInput
-                style={styles.input}
+                style={commonStyles.input}
                 placeholder="Número de invitados"
                 keyboardType="numeric"
                 value={form.cantidadInvitados}
                 onChangeText={(text) => updateForm('cantidadInvitados', text)}
+                placeholderTextColor="#999"
             />
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    container: { paddingHorizontal: 20, marginBottom: 20 },
-    input: {
-        width: '100%',
-        height: 50,
-        backgroundColor: '#ffffff',
-        borderRadius: 10,
-        paddingHorizontal: 15,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: 'rgb(71, 25, 82)',
-    },
-    textArea: { height: 100, textAlignVertical: 'top' },
-});
 
 export default EventInfoForm;

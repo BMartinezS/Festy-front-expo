@@ -1,10 +1,11 @@
+// components/MapComponent.tsx
 import React, { Suspense } from 'react';
 import { Platform, Text, View } from 'react-native';
 
 interface MapProps {
     latitude: number;
     longitude: number;
-    onLocationSelect: (lat: number, lng: number) => void;
+    onLocationSelect: (lat: number, lng: number, address?: string) => void;
 }
 
 // Importaciones condicionales mejoradas

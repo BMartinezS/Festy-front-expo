@@ -1,7 +1,7 @@
-// components/PaymentDetailsSection.tsx
 import React from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TextInput } from 'react-native';
 import { EventForm } from './types';
+import { commonStyles, colors, typography, spacing } from '@/styles/eventForm';
 
 interface PaymentDetailsSectionProps {
     form: any;
@@ -9,82 +9,89 @@ interface PaymentDetailsSectionProps {
 }
 
 const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({ form, updateForm }) => {
+    // Calculamos el total de productos considerando las cantidades
+    const totalProductos = form.productos.reduce((sum: number, item: any) =>
+        sum + (item.product.price * item.quantity), 0);
+
+    // Calculamos la cantidad total de invitados
+    const cantidadPersonas = parseInt(form.cantidadInvitados) || 0;
+
+    // Calculamos la cuota por persona
+    const cuotaPorPersona = cantidadPersonas > 0 ? totalProductos / cantidadPersonas : 0;
+
+    // Actualizamos el estado de cuotaCalculada cuando cambian los valores
+    React.useEffect(() => {
+        updateForm('cuotaCalculada', {
+            totalProductos,
+            cantidadPersonas,
+            cuotaPorPersona
+        });
+    }, [totalProductos, cantidadPersonas, cuotaPorPersona, updateForm]);
+
     return (
-        <View style={styles.container}>
-            <Text style={styles.cardTitle}>Cálculo de Cuota</Text>
-            <View style={styles.calculoRow}>
-                <Text style={styles.calculoLabel}>Total Productos:</Text>
-                <Text style={styles.calculoValue}>
-                    ${form.cuotaCalculada.totalProductos.toLocaleString()}
+        <View style={commonStyles.container}>
+            <Text style={commonStyles.cardTitle}>Cálculo de Cuota</Text>
+
+            <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingVertical: spacing.sm,
+            }}>
+                <Text style={{ ...typography.body, color: colors.gray[600] }}>Total Productos:</Text>
+                <Text style={{ ...typography.body, color: colors.primaryDark, fontWeight: '500' }}>
+                    ${totalProductos.toLocaleString()}
                 </Text>
             </View>
-            <View style={styles.calculoRow}>
-                <Text style={styles.calculoLabel}>Cantidad de Invitados:</Text>
-                <Text style={styles.calculoValue}>{form.cuotaCalculada.cantidadPersonas}</Text>
-            </View>
-            <View style={[styles.calculoRow, styles.totalRow]}>
-                <Text style={styles.calculoLabelTotal}>Cuota por Persona:</Text>
-                <Text style={styles.calculoValueTotal}>
-                    ${Math.ceil(form.cuotaCalculada.cuotaPorPersona).toLocaleString()}
+
+            <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingVertical: spacing.sm,
+            }}>
+                <Text style={{ ...typography.body, color: colors.gray[600] }}>Cantidad de Invitados:</Text>
+                <Text style={{ ...typography.body, color: colors.primaryDark, fontWeight: '500' }}>
+                    {cantidadPersonas}
                 </Text>
             </View>
+
+            <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingVertical: spacing.sm,
+                borderTopWidth: 1,
+                borderTopColor: colors.primaryBorder,
+                marginTop: spacing.sm,
+                paddingTop: spacing.md,
+                marginBottom: spacing.lg,
+            }}>
+                <Text style={{ ...typography.subtitle }}>Cuota por Persona:</Text>
+                <Text style={{ ...typography.subtitle }}>
+                    ${Math.ceil(cuotaPorPersona).toLocaleString()}
+                </Text>
+            </View>
+
             <TextInput
-                style={styles.input}
+                style={commonStyles.input}
                 placeholder="Ajustar cuota por persona"
-                value={form.cuotaAmount}
+                value={Math.ceil(cuotaPorPersona).toLocaleString()}
                 onChangeText={(text) => updateForm('cuotaAmount', text)}
                 keyboardType="numeric"
+                placeholderTextColor={colors.gray[400]}
             />
-            <Text style={styles.helperText}>
+
+            <Text style={{
+                ...typography.small,
+                color: colors.gray[600],
+                fontStyle: 'italic',
+                marginTop: spacing.xs
+            }}>
                 Puedes ajustar la cuota manualmente si lo deseas
             </Text>
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    container: { paddingHorizontal: 20, marginBottom: 20 },
-    cardTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(71, 25, 82, 0.1)',
-        paddingBottom: 8,
-    },
-    calculoRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 8,
-    },
-    calculoLabel: { fontSize: 14, color: '#666' },
-    calculoValue: { fontSize: 14, color: 'rgb(51, 18, 59)', fontWeight: '500' },
-    totalRow: {
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(71, 25, 82, 0.1)',
-        marginTop: 8,
-        paddingTop: 12,
-        marginBottom: 15,
-    },
-    calculoLabelTotal: { fontSize: 16, fontWeight: '600', color: 'rgb(51, 18, 59)' },
-    calculoValueTotal: { fontSize: 16, fontWeight: '600', color: 'rgb(51, 18, 59)' },
-    input: {
-        width: '100%',
-        height: 50,
-        backgroundColor: '#ffffff',
-        borderRadius: 10,
-        paddingHorizontal: 15,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: 'rgb(71, 25, 82)',
-    },
-    helperText: {
-        fontSize: 12,
-        color: '#666',
-        fontStyle: 'italic',
-        marginTop: 5,
-    },
-});
 
 export default PaymentDetailsSection;

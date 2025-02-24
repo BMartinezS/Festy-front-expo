@@ -4,7 +4,6 @@ import { StyleSheet, KeyboardAvoidingView, Platform, FlatList } from 'react-nati
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { eventService } from '@/services/event.service';
-import { API_URL } from '@/constants';
 
 // Importamos los componentes separados
 import ImageSelector from '@/components/EventForm/ImageSelector';
@@ -178,8 +177,11 @@ export default function CreateEventScreen() {
                         <DateTimePickerSection form={form} updateForm={updateForm} />
                         <MapSection
                             initialCoordinates={INITIAL_COORDINATES}
-                            onLocationSelect={(lat, lng) =>
-                                updateForm('ubicacion', { coordinates: [lat, lng], address: 'Dirección pendiente' })
+                            onLocationSelect={(lat, lng, address) =>
+                                updateForm('ubicacion', {
+                                    coordinates: [lat, lng],
+                                    address: address || 'Dirección pendiente'
+                                })
                             }
                         />
                         <ProductSearchSection form={form} updateForm={updateForm} setError={setError} />

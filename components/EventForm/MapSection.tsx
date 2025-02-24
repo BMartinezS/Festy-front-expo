@@ -5,7 +5,7 @@ import MapComponent from '@/components/MapComponent';
 
 interface MapSectionProps {
     initialCoordinates: { latitude: number; longitude: number };
-    onLocationSelect: (lat: number, lng: number) => void;
+    onLocationSelect: (lat: number, lng: number, address?: string) => void;
 }
 
 const MapSection: React.FC<MapSectionProps> = ({ initialCoordinates, onLocationSelect }) => {

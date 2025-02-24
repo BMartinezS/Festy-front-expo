@@ -48,15 +48,15 @@ const ImageSelector: React.FC<ImageSelectorProps> = ({ image, updateImage, setEr
 const styles = StyleSheet.create({
     imageContainer: { marginVertical: 20 },
     imageSelector: {
-        width: '100%',
         height: 200,
         borderRadius: 10,
         overflow: 'hidden',
         backgroundColor: '#f0f0f0',
         borderWidth: 1,
         borderColor: 'rgb(71, 25, 82)',
+        margin: 10
     },
-    eventImage: { width: '100%', height: '100%' },
+    eventImage: { width: '100%', height: '100%'},
     imagePlaceholder: {
         width: '100%',
         height: '100%',
