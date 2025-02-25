@@ -1,95 +1,213 @@
-// app/event/index.tsx
+// app/(tabs)/events.tsx
 import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     View,
     Text,
-    FlatList,
     TouchableOpacity,
+    FlatList,
     RefreshControl,
     ActivityIndicator,
+    Alert,
+    Image,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Event, eventService } from '@/services/event.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Event, eventService } from '@/services/event.service';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function EventsScreen() {
     const [events, setEvents] = useState<Event[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'active', 'upcoming', 'past'
 
+    // Cargar eventos al montar el componente
+    useEffect(() => {
+        loadEvents();
+    }, []);
+
+    // Función para cargar los eventos
     const loadEvents = async () => {
         try {
             setRefreshing(true);
+
             const token = await AsyncStorage.getItem('userToken');
-            if (!token) throw new Error('No token found');
+            if (!token) {
+                router.replace('/auth/login');
+                return;
+            }
 
-            const datosEvento = await eventService.getEvents(token);
+            const response = await eventService.getEvents(token);
 
-            if ('error' in datosEvento) {
+            if ('error' in response) {
+                setError(response.error);
                 setEvents([]);
                 return;
             }
 
-            const { data } = datosEvento;
-
-            console.log('data: ', data);
-            setEvents(data);
+            setEvents(response.data || []);
             setError('');
         } catch (error: any) {
             setError(error.message || 'Error al cargar eventos');
+            console.error('Error al cargar eventos:', error);
         } finally {
             setRefreshing(false);
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        loadEvents();
-    }, []);
+    // Función para filtrar eventos según el filtro activo
+    const getFilteredEvents = () => {
+        const now = new Date();
 
-    const renderEventCard = ({ item: event }: { item: any }) => (
-        <TouchableOpacity
-            style={styles.card}
-            onPress={() => router.push(`/event/${event._id}`)}
-        >
-            <Text style={styles.cardTitle}>{event.nombre}</Text>
-            <Text style={styles.cardDate}>
-                Inicio {new Date(event.fechaInicio).toLocaleDateString()} a las {new Date(event.fechaInicio).toLocaleTimeString()}
-            </Text>
-            <Text style={styles.cardAddress}>{event.ubicacion.address}</Text>
+        switch (activeFilter) {
+            case 'active':
+                return events.filter(event => event.status === 'active');
+            case 'upcoming':
+                return events.filter(event => new Date(event.fechaInicio) > now);
+            case 'past':
+                return events.filter(event => new Date(event.fechaInicio) < now && event.status !== 'draft');
+            default:
+                return events;
+        }
+    };
 
-            <View style={styles.cardFooter}>
-                <View
-                    style={[
-                        styles.statusContainer,
-                        event.status === 'active' && styles.activeStatusContainer,
-                    ]}
-                >
-                    <Text style={styles.cardStatus}>
-                        {event.status.toUpperCase()}
-                    </Text>
+    // Función para renderizar cada evento en la lista
+    const renderEventCard = ({ item: event }: { item: Event }) => {
+        const eventDate = new Date(event.fechaInicio);
+        const isUpcoming = eventDate > new Date();
+
+        return (
+            <TouchableOpacity
+                style={styles.card}
+                onPress={() => router.push(`/event/${event._id}`)}
+                activeOpacity={0.7}
+            >
+                {event.imagen ? (
+                    <Image source={{ uri: event.imagen }} style={styles.cardImage} />
+                ) : (
+                    <View style={styles.cardImagePlaceholder}>
+                        <Ionicons name="calendar-outline" size={30} color="#ccc" />
+                    </View>
+                )}
+
+                <View style={styles.cardContent}>
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
+                            {event.nombre}
+                        </Text>
+
+                        <View style={[
+                            styles.statusBadge,
+                            event.status === 'active' ? styles.activeBadge :
+                                event.status === 'completed' ? styles.completedBadge :
+                                    event.status === 'cancelled' ? styles.cancelledBadge :
+                                        styles.draftBadge
+                        ]}>
+                            <Text style={styles.statusText}>
+                                {event.status.toUpperCase()}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.cardInfo}>
+                        <View style={styles.infoItem}>
+                            <Ionicons name="time-outline" size={16} color="#666" />
+                            <Text style={styles.infoText}>
+                                {eventDate.toLocaleDateString()} {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                        </View>
+
+                        <View style={styles.infoItem}>
+                            <Ionicons name="location-outline" size={16} color="#666" />
+                            <Text style={styles.infoText} numberOfLines={1} ellipsizeMode="tail">
+                                {event.ubicacion.address}
+                            </Text>
+                        </View>
+
+                        <View style={styles.infoItem}>
+                            <Ionicons name="people-outline" size={16} color="#666" />
+                            <Text style={styles.infoText}>
+                                {event.invitados.length} / {event.cantidadInvitados || 0} invitados
+                            </Text>
+                        </View>
+                    </View>
+
+                    {event.requiresPayment && (
+                        <View style={styles.paymentInfo}>
+                            <Ionicons name="cash-outline" size={16} color="rgb(71, 25, 82)" />
+                            <Text style={styles.paymentText}>
+                                ${event.cuotaAmount} por persona
+                            </Text>
+                        </View>
+                    )}
                 </View>
-                <Text style={styles.cardGuests}>
-                    {event.cantidadInvitados} invitados, confirmados: {event.invitados.length}
-                </Text>
-            </View>
-        </TouchableOpacity>
-    );
+            </TouchableOpacity>
+        );
+    };
 
+    // Función para renderizar estado vacío
     const renderEmptyState = () => (
         <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>No hay eventos disponibles</Text>
+            <Ionicons name="calendar-outline" size={60} color="#ccc" />
+            <Text style={styles.emptyTitle}>No hay eventos</Text>
             <Text style={styles.emptySubtitle}>
-                ¡Crea tu primer evento usando el botón +
-                en la esquina!
+                ¡Crea tu primer evento usando el botón + en la esquina inferior!
             </Text>
+        </View>
+    );
+
+    // Función para renderizar los filtros
+    const renderFilters = () => (
+        <View style={styles.filterContainer}>
+            <TouchableOpacity
+                style={[styles.filterButton, activeFilter === 'all' && styles.activeFilterButton]}
+                onPress={() => setActiveFilter('all')}
+            >
+                <Text style={[styles.filterText, activeFilter === 'all' && styles.activeFilterText]}>
+                    Todos
+                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.filterButton, activeFilter === 'active' && styles.activeFilterButton]}
+                onPress={() => setActiveFilter('active')}
+            >
+                <Text style={[styles.filterText, activeFilter === 'active' && styles.activeFilterText]}>
+                    Activos
+                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.filterButton, activeFilter === 'upcoming' && styles.activeFilterButton]}
+                onPress={() => setActiveFilter('upcoming')}
+            >
+                <Text style={[styles.filterText, activeFilter === 'upcoming' && styles.activeFilterText]}>
+                    Próximos
+                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.filterButton, activeFilter === 'past' && styles.activeFilterButton]}
+                onPress={() => setActiveFilter('past')}
+            >
+                <Text style={[styles.filterText, activeFilter === 'past' && styles.activeFilterText]}>
+                    Pasados
+                </Text>
+            </TouchableOpacity>
         </View>
     );
 
     return (
         <View style={styles.container}>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Mis Eventos</Text>
+            </View>
+
+            {renderFilters()}
+
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             {loading ? (
@@ -100,12 +218,12 @@ export default function EventsScreen() {
                 />
             ) : (
                 <FlatList
-                    data={events}
+                    data={getFilteredEvents()}
                     renderItem={renderEventCard}
                     keyExtractor={(item) => item._id}
                     contentContainerStyle={[
                         styles.listContainer,
-                        events.length === 0 && styles.emptyListContainer,
+                        getFilteredEvents().length === 0 && styles.emptyListContainer,
                     ]}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
                     refreshControl={
@@ -119,7 +237,7 @@ export default function EventsScreen() {
                 style={styles.fab}
                 onPress={() => router.push('/event/create')}
             >
-                <Text style={styles.fabText}>+</Text>
+                <Ionicons name="add" size={24} color="#ffffff" />
             </TouchableOpacity>
         </View>
     );
@@ -130,8 +248,44 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f8f9fa',
     },
+    header: {
+        backgroundColor: 'rgb(51, 18, 59)',
+        paddingTop: 60,
+        paddingBottom: 20,
+        paddingHorizontal: 20,
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#ffffff',
+    },
+    filterContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    filterButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginRight: 8,
+    },
+    activeFilterButton: {
+        backgroundColor: 'rgb(51, 18, 59)',
+    },
+    filterText: {
+        fontSize: 14,
+        color: '#666',
+    },
+    activeFilterText: {
+        color: '#ffffff',
+        fontWeight: '500',
+    },
     listContainer: {
-        padding: 20,
+        padding: 15,
     },
     emptyListContainer: {
         flex: 1,
@@ -141,54 +295,89 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: '#ffffff',
         borderRadius: 10,
-        padding: 15,
-        borderWidth: 1,
-        borderColor: 'rgb(71, 25, 82)',
+        overflow: 'hidden',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3,
         elevation: 2,
+        borderWidth: 1,
+        borderColor: '#eee',
+    },
+    cardImage: {
+        width: '100%',
+        height: 120,
+    },
+    cardImagePlaceholder: {
+        width: '100%',
+        height: 120,
+        backgroundColor: '#f5f5f5',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cardContent: {
+        padding: 15,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
     },
     cardTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         color: 'rgb(51, 18, 59)',
-        marginBottom: 8,
+        flex: 1,
     },
-    cardDate: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 4,
-    },
-    cardAddress: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 8,
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    statusContainer: {
-        paddingVertical: 2,
+    statusBadge: {
         paddingHorizontal: 8,
+        paddingVertical: 4,
         borderRadius: 4,
-        backgroundColor: '#eee',
+        marginLeft: 10,
     },
-    activeStatusContainer: {
+    activeBadge: {
         backgroundColor: '#28a745',
     },
-    cardStatus: {
-        fontSize: 12,
-        color: '#fff',
+    completedBadge: {
+        backgroundColor: '#6c757d',
+    },
+    cancelledBadge: {
+        backgroundColor: '#dc3545',
+    },
+    draftBadge: {
+        backgroundColor: '#ffc107',
+    },
+    statusText: {
+        fontSize: 10,
+        color: '#ffffff',
         fontWeight: 'bold',
     },
-    cardGuests: {
-        fontSize: 12,
+    cardInfo: {
+        marginBottom: 10,
+    },
+    infoItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 5,
+    },
+    infoText: {
+        fontSize: 14,
         color: '#666',
+        marginLeft: 8,
+    },
+    paymentInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+    },
+    paymentText: {
+        fontSize: 14,
+        color: 'rgb(71, 25, 82)',
+        fontWeight: '500',
+        marginLeft: 8,
     },
     separator: {
         height: 15,
@@ -203,16 +392,11 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgb(51, 18, 59)',
         justifyContent: 'center',
         alignItems: 'center',
-        elevation: 4,
+        elevation: 5,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-    },
-    fabText: {
-        fontSize: 24,
-        color: '#ffffff',
-        fontWeight: 'bold',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.27,
+        shadowRadius: 4.65,
     },
     errorText: {
         color: '#ff4646',
@@ -224,18 +408,18 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: 30,
     },
     emptyTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
+        color: '#666',
+        marginTop: 15,
         marginBottom: 8,
-        textAlign: 'center',
     },
     emptySubtitle: {
         fontSize: 16,
-        color: '#666',
+        color: '#999',
         textAlign: 'center',
         lineHeight: 22,
     },

@@ -25,7 +25,6 @@ interface ProductSearchSectionProps {
 interface ProductInstance {
     instanceId: string;
     product: Product;
-    quantity: number;
 }
 
 const ProductSearchSection: React.FC<ProductSearchSectionProps> = ({ form, updateForm, setError }) => {
@@ -36,7 +35,7 @@ const ProductSearchSection: React.FC<ProductSearchSectionProps> = ({ form, updat
     const searchInputRef = useRef<TextInput>(null);
 
     const totalAmount = form.productos.reduce((sum: number, item: ProductInstance) =>
-        sum + (item.product.price * item.quantity), 0);
+        sum + (item.product.price * item.product.quantity), 0);
 
     const handleSearchChange = (text: string) => {
         setSearchQuery(text);
@@ -64,10 +63,10 @@ const ProductSearchSection: React.FC<ProductSearchSectionProps> = ({ form, updat
     }, [searchQuery, setError]);
 
     const handleAddProduct = (product: any) => {
+        product.quantity = 1;
         const newInstance: ProductInstance = {
             instanceId: `${product.externalId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             product: product,
-            quantity: 1
         };
 
         updateForm('productos', [...form.productos, newInstance]);
@@ -82,8 +81,8 @@ const ProductSearchSection: React.FC<ProductSearchSectionProps> = ({ form, updat
     const handleUpdateQuantity = (instanceId: string, delta: number) => {
         const updatedProducts = form.productos.map((item: ProductInstance) => {
             if (item.instanceId === instanceId) {
-                const newQuantity = Math.max(1, item.quantity + delta); // Mínimo 1
-                return { ...item, quantity: newQuantity };
+                item.product.quantity = Math.max(1, item.product.quantity + delta); // Mínimo 1
+                return { ...item };
             }
             return item;
         });
@@ -113,7 +112,7 @@ const ProductSearchSection: React.FC<ProductSearchSectionProps> = ({ form, updat
                 <Text style={{ ...typography.body, fontWeight: '500' }}>{item.product.name}</Text>
                 <Text style={{ ...typography.body, color: colors.primaryDark, fontWeight: '600' }}>
                     <Text>$</Text>
-                    {(item.product.price * item.quantity).toLocaleString()}
+                    {(item.product.price * item.product.quantity).toLocaleString()}
                 </Text>
             </View>
             <View style={{
@@ -141,7 +140,7 @@ const ProductSearchSection: React.FC<ProductSearchSectionProps> = ({ form, updat
                     minWidth: 20,
                     textAlign: 'center'
                 }}>
-                    {item.quantity}
+                    {item.product.quantity}
                 </Text>
                 <TouchableOpacity
                     onPress={() => handleUpdateQuantity(item.instanceId, 1)}
@@ -196,7 +195,7 @@ const ProductSearchSection: React.FC<ProductSearchSectionProps> = ({ form, updat
                     }}>
                         <Text style={{ ...typography.subtitle }}>
                             <Text>Productos Seleccionados (</Text>
-                            <Text>{form.productos.reduce((sum: number, item: ProductInstance) => sum + item.quantity, 0)}</Text>
+                            <Text>{form.productos.reduce((sum: number, item: ProductInstance) => sum + item.product.quantity, 0)}</Text>
                             <Text>)</Text>
                         </Text>
                         <Text style={{ ...typography.subtitle }}>

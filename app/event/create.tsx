@@ -23,6 +23,7 @@ export interface Product {
     brand: string;
     imageUrl: string;
     price: number;
+    quantity: number;
 }
 
 export interface EventForm {
@@ -37,7 +38,7 @@ export interface EventForm {
         coordinates: [number, number];
         address: string;
     };
-    productos: Product[];
+    productos: any[];
     cantidadInvitados: string;
     notasAdicionales: string;
     requerimientos: {
@@ -91,6 +92,7 @@ export default function CreateEventScreen() {
     const [form, setForm] = useState<EventForm>(INITIAL_FORM_STATE);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [initialCalculationDone, setInitialCalculationDone] = useState(false);
 
     // Función para actualizar el formulario
     const updateForm = useCallback((field: keyof EventForm, value: any) => {
@@ -99,18 +101,40 @@ export default function CreateEventScreen() {
 
     // Efecto para calcular la cuota cuando se modifican productos o cantidad de invitados
     useEffect(() => {
-        if (form.requiresPayment) {
-            const totalProductos = form.productos.reduce((sum, p) => sum + p.price, 0);
+        if (form.requiresPayment && (form.productos.length > 0 || parseInt(form.cantidadInvitados) > 0)) {
+            // Calcula el valor total de los productos según la estructura Product
+            const totalProductos = form.productos.reduce((sum, p) => {
+                // Si el producto tiene la estructura {product: Product, quantity: number}
+                if (p.product && typeof p.product === 'object') {
+                    const price = p.product.price || 0;
+                    const quantity = p.quantity || 1;
+                    return sum + (price * quantity);
+                }
+                // Si el producto es directamente un Product
+                else if (p.price && typeof p.price === 'number') {
+                    return sum + (p.price * (p.quantity || 1));
+                }
+                return sum;
+            }, 0);
+
+            // Resto del código para calcular cuota...
             const cantidadPersonas = parseInt(form.cantidadInvitados) || 0;
             const cuotaPorPersona = cantidadPersonas > 0 ? totalProductos / cantidadPersonas : 0;
+            const cuotaRedondeada = Math.ceil(cuotaPorPersona);
+
             updateForm('cuotaCalculada', {
                 totalProductos,
                 cuotaPorPersona,
                 cantidadPersonas,
             });
-            updateForm('cuotaAmount', cuotaPorPersona.toString());
+
+            if (!form.cuotaAmount || form.cuotaAmount === '0' || isNaN(Number(form.cuotaAmount))) {
+                updateForm('cuotaAmount', cuotaRedondeada.toString());
+            }
+
+            setInitialCalculationDone(true);
         }
-    }, [form.productos, form.cantidadInvitados, form.requiresPayment, updateForm]);
+    }, [form.productos, form.cantidadInvitados, form.requiresPayment]);
 
     // Función para validar y enviar el formulario
     const handleSubmit = async () => {
@@ -138,13 +162,35 @@ export default function CreateEventScreen() {
             const token = await AsyncStorage.getItem('userToken');
             if (!token) throw new Error('No hay sesión activa');
 
+            const { productos } = form;
+
+            const productosSinInstanceId = productos.map((producto: any) => {
+                const { instanceId, ...resto } = producto;
+                return resto;
+            })
+
+            const productosTransformados = productosSinInstanceId.map((item: any) => {
+                // Si el item tiene una estructura con product como clave, retornamos solo ese objeto
+                if (item.product) {
+                    return item.product;
+                }
+                // Si no tiene esa estructura, retornamos el objeto original
+                return item;
+            });
+
+            form.productos = productosTransformados;
+
             // Envío del formulario (adaptar según la API)
-            await eventService.createEvent(token, {
+            const response = await eventService.createEvent(token, {
                 ...form,
                 cuotaAmount: form.requiresPayment ? parseFloat(form.cuotaAmount) : 0,
                 cantidadInvitados: parseInt(form.cantidadInvitados) || 0,
             });
-            router.back();
+
+            if ('success' in response) {
+                console.log('Evento creado con éxito!');
+                router.push('/event')
+            }
         } catch (error: any) {
             setError(error.message || 'Error al crear el evento');
         } finally {
