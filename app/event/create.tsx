@@ -15,73 +15,10 @@ import ProductSearchSection from '@/components/EventForm/ProductSearchSection';
 import PaymentDetailsSection from '@/components/EventForm/PaymentDetailsSection';
 import Footer from '@/components/EventForm/Footer';
 import PaymentSwitch from '@/components/EventForm/PaymentSwitch';
+import { EventForm } from '@/types/event_types';
+import { INITIAL_FORM_STATE } from '@/types/event_types';
 
 // Estado inicial del formulario
-export interface Product {
-    externalId: string;
-    name: string;
-    brand: string;
-    imageUrl: string;
-    price: number;
-    quantity: number;
-}
-
-export interface EventForm {
-    imagen: string;
-    nombre: string;
-    descripcion: string;
-    fechaInicio: Date;
-    fechaFin: Date;
-    duracion: string;
-    tipo: string;
-    ubicacion: {
-        coordinates: [number, number];
-        address: string;
-    };
-    productos: any[];
-    cantidadInvitados: string;
-    notasAdicionales: string;
-    requerimientos: {
-        codigoVestimenta: string;
-        alimentacion: string;
-        edadMinima: string;
-        llevar: string;
-    };
-    requiresPayment: boolean;
-    cuotaAmount: string;
-    cuotaCalculada: {
-        totalProductos: number;
-        cuotaPorPersona: number;
-        cantidadPersonas: number;
-    };
-}
-
-export const INITIAL_FORM_STATE: EventForm = {
-    imagen: '',
-    nombre: '',
-    descripcion: '',
-    fechaInicio: new Date(),
-    fechaFin: new Date(),
-    duracion: '',
-    tipo: '',
-    ubicacion: { coordinates: [0, 0], address: '' },
-    productos: [],
-    cantidadInvitados: '0',
-    notasAdicionales: '',
-    requerimientos: {
-        codigoVestimenta: '',
-        alimentacion: '',
-        edadMinima: '',
-        llevar: '',
-    },
-    requiresPayment: false,
-    cuotaAmount: '0',
-    cuotaCalculada: {
-        totalProductos: 0,
-        cuotaPorPersona: 0,
-        cantidadPersonas: 0,
-    },
-};
 
 const INITIAL_COORDINATES = {
     latitude: -33.441622,

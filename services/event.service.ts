@@ -1,26 +1,58 @@
 // services/eventService.ts
 import { API_URL } from "@/constants";
+import { Product } from "@/types/event_types";
+
+
+export interface EventToUpdate {
+    _id: string;
+    anfitrion: any;
+    cantidadInvitados: number;
+    createdAt: Date;
+    cuotaAmount: number;
+    cuotaCalculada: {
+        cantidadPersonas: number;
+        cuotaPorPersona: number;
+        totalProductos: number;
+    };
+    descripcion: string;
+    duracion: string;
+    fechaFin: Date;
+    fechaInicio: Date;
+    imagen: string;
+    invitados: any[];
+    nombre: string;
+    notasAdicionales: string;
+    productos: Product[];
+    requerimientos: {
+        alimentacion: string;
+        codigoVestimenta: string;
+        edadMinima: string;
+        llevar: string;
+    };
+    requiresPayment: boolean;
+    status: string;
+    tipo: string;
+    ubicacion: {
+        _id: string;
+        address: string;
+        coordinates: number[];
+    };
+    updatedAt: Date;
+}
 
 export interface Event {
     _id: string;
+    imagen?: string;
     nombre: string;
     descripcion?: string;
     fechaInicio: Date;
     fechaFin?: Date;
     duracion?: string;
     tipo: string;
-    imagen?: string;
     ubicacion: {
-        coordinates: number[];
+        coordinates: [number, number];
         address: string;
     };
-    invitados: Array<{
-        userId?: string;
-        phone: string;
-        status: 'pending' | 'registered' | 'confirmed' | 'declined';
-        hasPaid: boolean;
-        paymentStatus: 'pending' | 'processing' | 'completed' | 'failed';
-    }>;
     productos?: Array<{
         externalId: string;
         name: string;
@@ -29,18 +61,25 @@ export interface Event {
         price: number;
         quantity?: number;
     }>;
-    status: 'draft' | 'active' | 'cancelled' | 'completed';
-    requiresPayment: boolean;
-    cuotaAmount?: number;
     cantidadInvitados?: number;
-    whatsappGroupId?: string;
+    notasAdicionales?: string;
     requerimientos?: {
         codigoVestimenta?: string;
         alimentacion?: string;
         edadMinima?: string;
         llevar?: string;
     };
-    notasAdicionales?: string;
+    requiresPayment: boolean;
+    cuotaAmount?: number;
+    invitados: Array<{
+        userId?: string;
+        phone: string;
+        status: 'pending' | 'registered' | 'confirmed' | 'declined';
+        hasPaid: boolean;
+        paymentStatus: 'pending' | 'processing' | 'completed' | 'failed';
+    }>;
+    status: 'draft' | 'active' | 'cancelled' | 'completed';
+    whatsappGroupId?: string;
     encuestas?: Array<{
         _id: string;
         pregunta: string;

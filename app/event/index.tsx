@@ -8,7 +8,6 @@ import {
     FlatList,
     RefreshControl,
     ActivityIndicator,
-    Alert,
     Image,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -77,7 +76,6 @@ export default function EventsScreen() {
     // Función para renderizar cada evento en la lista
     const renderEventCard = ({ item: event }: { item: Event }) => {
         const eventDate = new Date(event.fechaInicio);
-        const isUpcoming = eventDate > new Date();
 
         return (
             <TouchableOpacity

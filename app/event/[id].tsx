@@ -11,220 +11,31 @@ import {
     Modal,
     Alert,
     Image,
-    Linking,
     ActivityIndicator,
     Platform,
     KeyboardAvoidingView,
     Switch,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
-import { Event, eventService } from '@/services/event.service';
-import { whatsappService } from '@/services/whatsapp.service';
+import { eventService, EventToUpdate } from '@/services/event.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-
-// Componente para las encuestas
-const PollSection = ({
-    event,
-    token,
-    onRefresh
-}: {
-    event: Event,
-    token: string,
-    onRefresh: () => Promise<void>
-}) => {
-    const [showModal, setShowModal] = useState(false);
-    const [question, setQuestion] = useState('');
-    const [options, setOptions] = useState<string[]>(['', '']);
-    const [isLoading, setIsLoading] = useState(false);
-
-    const addOption = () => {
-        setOptions([...options, '']);
-    };
-
-    const removeOption = (index: number) => {
-        if (options.length > 2) {
-            const newOptions = [...options];
-            newOptions.splice(index, 1);
-            setOptions(newOptions);
-        }
-    };
-
-    const updateOption = (index: number, value: string) => {
-        const newOptions = [...options];
-        newOptions[index] = value;
-        setOptions(newOptions);
-    };
-
-    const createPoll = async () => {
-        if (!question.trim()) {
-            Alert.alert('Error', 'La pregunta es obligatoria');
-            return;
-        }
-
-        const validOptions = options.filter(opt => opt.trim() !== '');
-        if (validOptions.length < 2) {
-            Alert.alert('Error', 'Debes incluir al menos 2 opciones');
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-            await eventService.createPoll(token, event._id, question, validOptions);
-
-            // Si hay grupo de WhatsApp, enviamos la encuesta al grupo
-            if (event.whatsappGroupId) {
-                try {
-                    await whatsappService.sendPoll(token, event.whatsappGroupId, question, validOptions);
-                } catch (error) {
-                    console.error('Error al enviar encuesta a WhatsApp:', error);
-                    // Continuamos aunque falle el envío a WhatsApp
-                }
-            }
-
-            setShowModal(false);
-            setQuestion('');
-            setOptions(['', '']);
-            onRefresh();
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'No se pudo crear la encuesta');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Encuestas</Text>
-                <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => setShowModal(true)}
-                >
-                    <Text style={styles.addButtonText}>+ Nueva Encuesta</Text>
-                </TouchableOpacity>
-            </View>
-
-            {event.encuestas && event.encuestas.length > 0 ? (
-                event.encuestas.map((poll, index) => (
-                    <View key={poll._id || index} style={styles.pollCard}>
-                        <Text style={styles.pollQuestion}>{poll.pregunta}</Text>
-                        {poll.opciones.map((option, optIndex) => (
-                            <View key={optIndex} style={styles.pollOption}>
-                                <Text style={styles.pollOptionText}>{option}</Text>
-                                <View style={styles.pollBar}>
-                                    <View
-                                        style={[
-                                            styles.pollBarFill,
-                                            {
-                                                width: `${poll.votos && poll.votos.length > 0
-                                                    ? (poll.votos.find(v => v.opcion === option)?.cantidad || 0) * 100 /
-                                                    poll.votos.reduce((sum, v) => sum + v.cantidad, 0)
-                                                    : 0}%`
-                                            }
-                                        ]}
-                                    />
-                                </View>
-                                <Text style={styles.pollCount}>
-                                    {poll.votos && poll.votos.find(v => v.opcion === option)?.cantidad || 0} votos
-                                </Text>
-                            </View>
-                        ))}
-                    </View>
-                ))
-            ) : (
-                <Text style={styles.emptyText}>No hay encuestas creadas</Text>
-            )}
-
-            <Modal
-                visible={showModal}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setShowModal(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Nueva Encuesta</Text>
-
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Pregunta"
-                            value={question}
-                            onChangeText={setQuestion}
-                        />
-
-                        <Text style={styles.modalSubtitle}>Opciones:</Text>
-                        {options.map((option, index) => (
-                            <View key={index} style={styles.optionContainer}>
-                                <TextInput
-                                    style={styles.optionInput}
-                                    placeholder={`Opción ${index + 1}`}
-                                    value={option}
-                                    onChangeText={(text) => updateOption(index, text)}
-                                />
-                                {options.length > 2 && (
-                                    <TouchableOpacity
-                                        style={styles.removeButton}
-                                        onPress={() => removeOption(index)}
-                                    >
-                                        <Ionicons name="close-circle" size={24} color="#ff4646" />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        ))}
-
-                        <TouchableOpacity style={styles.addOptionButton} onPress={addOption}>
-                            <Text style={styles.addOptionText}>+ Agregar Opción</Text>
-                        </TouchableOpacity>
-
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.cancelButton]}
-                                onPress={() => setShowModal(false)}
-                            >
-                                <Text style={styles.cancelButtonText}>Cancelar</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.createButton]}
-                                onPress={createPoll}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? (
-                                    <ActivityIndicator size="small" color="#ffffff" />
-                                ) : (
-                                    <Text style={styles.createButtonText}>Crear Encuesta</Text>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-        </View>
-    );
-};
+import MapSection from '@/components/EventForm/MapSection';
+import ProductSearchSection from '@/components/EventForm/ProductSearchSection';
 
 // Componente principal de detalle del evento
 export default function EventDetailScreen() {
     const { id } = useLocalSearchParams();
-    const [event, setEvent] = useState<Event | null>(null);
+    const [event, setEvent] = useState<EventToUpdate | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState('');
-    const [inviteModalVisible, setInviteModalVisible] = useState(false);
-    const [whatsappModalVisible, setWhatsappModalVisible] = useState(false);
-    const [newPhone, setNewPhone] = useState('');
-    const [groupName, setGroupName] = useState('');
-    const [inviteError, setInviteError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [selectedPhone, setSelectedPhone] = useState('');
-    const [paymentConcept, setPaymentConcept] = useState('');
 
     // Estado para modo edición
     const [isEditing, setIsEditing] = useState(false);
-    const [editableEvent, setEditableEvent] = useState<Partial<Event>>({});
+    const [editableEvent, seteditableEvent] = useState<Partial<EventToUpdate>>({});
     const [showDatePickerStart, setShowDatePickerStart] = useState(false);
     const [showDatePickerEnd, setShowDatePickerEnd] = useState(false);
     const [showImagePickerModal, setShowImagePickerModal] = useState(false);
@@ -247,6 +58,13 @@ export default function EventDetailScreen() {
         loadData();
     }, [id]);
 
+    useEffect(() => {
+        if (event) {
+            console.log('Evento:', event);
+            seteditableEvent(event);
+        }
+    }, [event]);
+
     // Función para cargar los datos del evento
     const loadEvent = async (userToken: string) => {
         try {
@@ -260,13 +78,8 @@ export default function EventDetailScreen() {
                 return;
             }
 
-            console.log('datA: ', data)
             setEvent(data.data);
 
-            // Si hay evento y no tiene nombre de grupo aún, sugerimos uno
-            if (data && !groupName) {
-                setGroupName(`${data.nombre} - ${new Date(data.fechaInicio).toLocaleDateString()}`);
-            }
         } catch (error: any) {
             setError(error.message || 'Error al cargar el evento');
         } finally {
@@ -284,19 +97,7 @@ export default function EventDetailScreen() {
     // Función para comenzar la edición del evento
     const handleStartEditing = () => {
         if (event) {
-            setEditableEvent({
-                nombre: event.nombre,
-                descripcion: event.descripcion,
-                fechaInicio: new Date(event.fechaInicio),
-                fechaFin: event.fechaFin ? new Date(event.fechaFin) : undefined,
-                ubicacion: { ...event.ubicacion },
-                tipo: event.tipo,
-                cantidadInvitados: event.cantidadInvitados,
-                requiresPayment: event.requiresPayment,
-                cuotaAmount: event.cuotaAmount,
-                requerimientos: event.requerimientos ? { ...event.requerimientos } : undefined,
-                imagen: event.imagen,
-            });
+            seteditableEvent(event);
             setIsEditing(true);
         }
     };
@@ -309,6 +110,9 @@ export default function EventDetailScreen() {
 
     // Función para guardar los cambios del evento
     const handleSaveChanges = async () => {
+
+        if (!event) return;
+
         if (!editableEvent.nombre || !editableEvent.fechaInicio) {
             Alert.alert('Error', 'El nombre y la fecha de inicio son obligatorios');
             return;
@@ -320,7 +124,7 @@ export default function EventDetailScreen() {
 
             if (!token || !id) throw new Error('No hay sesión activa');
 
-            await eventService.updateEvent(token, id as string, editableEvent);
+            await eventService.updateEvent(token, id as string, event);
             await handleRefresh();
             setIsEditing(false);
 
@@ -333,18 +137,18 @@ export default function EventDetailScreen() {
     };
 
     // Función para manejar los cambios en los campos del evento
-    const handleEventChange = (field: keyof Event, value: any) => {
-        setEditableEvent(prev => ({ ...prev, [field]: value }));
+    const handleEventChange = (field: keyof EventToUpdate, value: any) => {
+        seteditableEvent((prev: any) => ({ ...prev, [field]: value }));
     };
 
     // Función para manejar los cambios en los requerimientos
     const handleRequirementChange = (field: string, value: string) => {
-        setEditableEvent(prev => ({
+        seteditableEvent((prev: any) => ({
             ...prev,
             requerimientos: {
                 ...prev.requerimientos,
                 [field]: value
-            }
+            } as EventToUpdate['requerimientos']
         }));
     };
 
@@ -404,144 +208,6 @@ export default function EventDetailScreen() {
     // Función para manejar selección de fecha
     const handleDateChange = (field: 'fechaInicio' | 'fechaFin', date: Date) => {
         handleEventChange(field, date);
-    };
-
-    // Función para invitar a un nuevo participante
-    const handleInvite = async () => {
-        if (!newPhone) {
-            setInviteError('Por favor ingresa un número de teléfono');
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-            setInviteError('');
-
-            if (!token || !id) throw new Error('No hay sesión activa');
-
-            await eventService.inviteGuests(token, id as string, [newPhone]);
-
-            await handleRefresh();
-            setInviteModalVisible(false);
-            setNewPhone('');
-        } catch (error: any) {
-            setInviteError(error.message || 'Error al invitar');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Función para crear un grupo de WhatsApp
-    const handleCreateWhatsappGroup = async () => {
-        if (!groupName.trim()) {
-            Alert.alert('Error', 'El nombre del grupo es obligatorio');
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-
-            if (!token || !id || !event) throw new Error('No hay sesión activa o evento cargado');
-
-            // Crear el grupo de WhatsApp
-            const groupResponse = await whatsappService.createGroup(token, id as string, groupName);
-
-            // Actualizar el evento con el ID del grupo
-            const updatedEvent = await eventService.getEventById(token, id as string);
-            setEvent(updatedEvent);
-
-            setWhatsappModalVisible(false);
-
-            // Mostrar confirmación
-            Alert.alert(
-                'Grupo Creado',
-                'El grupo de WhatsApp ha sido creado exitosamente. Los invitados recibirán una invitación.',
-                [{ text: 'OK' }]
-            );
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'No se pudo crear el grupo de WhatsApp');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Función para solicitar pago a un invitado
-    const handleRequestPayment = async () => {
-        if (!event?.requiresPayment || !event.cuotaAmount) {
-            Alert.alert('Error', 'Este evento no requiere pagos');
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-
-            if (!token || !id) throw new Error('No hay sesión activa');
-
-            await whatsappService.sendPaymentRequest(
-                token,
-                id as string,
-                selectedPhone,
-                event.cuotaAmount,
-                paymentConcept || `Cuota para ${event.nombre}`
-            );
-
-            setShowPaymentModal(false);
-            setSelectedPhone('');
-            setPaymentConcept('');
-
-            Alert.alert(
-                'Solicitud Enviada',
-                'La solicitud de pago ha sido enviada al invitado vía WhatsApp.',
-                [{ text: 'OK' }]
-            );
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'No se pudo enviar la solicitud de pago');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // Función para marcar a un invitado como pagado
-    const handleMarkAsPaid = async (phone: string) => {
-        try {
-            if (!token || !id) throw new Error('No hay sesión activa');
-
-            await eventService.markGuestAsPaid(token, id as string, phone);
-            await handleRefresh();
-
-            Alert.alert(
-                'Pago Registrado',
-                'El pago ha sido registrado exitosamente.',
-                [{ text: 'OK' }]
-            );
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'No se pudo registrar el pago');
-        }
-    };
-
-    // Función para eliminar un invitado
-    const handleRemoveGuest = (phone: string) => {
-        Alert.alert(
-            'Eliminar Invitado',
-            '¿Estás seguro de que deseas eliminar a este invitado?',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Eliminar',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            if (!token || !id) throw new Error('No hay sesión activa');
-
-                            await eventService.removeGuest(token, id as string, phone);
-                            await handleRefresh();
-                        } catch (error: any) {
-                            Alert.alert('Error', error.message || 'No se pudo eliminar al invitado');
-                        }
-                    }
-                }
-            ]
-        );
     };
 
     // Función para eliminar el evento
@@ -746,23 +412,20 @@ export default function EventDetailScreen() {
                             )}
                         </View> */}
 
-                        {/* Ubicación */}
-                        <View style={styles.editSection}>
-                            <Text style={styles.editSectionTitle}>Ubicación</Text>
+                        <MapSection
+                            initialCoordinates={{
+                                latitude: editableEvent.ubicacion?.coordinates[0] || 0,
+                                longitude: editableEvent.ubicacion?.coordinates[1] || 0,
+                            }}
+                            onLocationSelect={(lat, lng, address) =>
+                                handleEventChange('ubicacion', {
+                                    coordinates: [lat, lng],
+                                    address: address || 'Dirección pendiente'
+                                })
+                            }
+                        />
 
-                            <Text style={styles.inputLabel}>Dirección*</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={editableEvent.ubicacion?.address}
-                                onChangeText={(text) => handleEventChange('ubicacion', {
-                                    ...editableEvent.ubicacion,
-                                    address: text
-                                })}
-                                placeholder="Dirección del evento"
-                            />
-
-                            {/* Aquí podría ir un mapa para seleccionar ubicación */}
-                        </View>
+                        <ProductSearchSection form={event} updateForm={handleEventChange} setError={setError} />
 
                         {/* Requerimientos */}
                         <View style={styles.editSection}>
@@ -924,9 +587,9 @@ export default function EventDetailScreen() {
 
                     {/* Cabecera del evento */}
                     <View style={styles.headerSection}>
-                        {event.imagen ? (
+                        {editableEvent.imagen ? (
                             <Image
-                                source={{ uri: event.imagen }}
+                                source={{ uri: editableEvent.imagen }}
                                 style={styles.eventImage}
                                 resizeMode="cover"
                             />
@@ -936,11 +599,11 @@ export default function EventDetailScreen() {
                             </View>
                         )}
 
-                        <Text style={styles.description}>{event.descripcion}</Text>
+                        <Text style={styles.description}>{editableEvent.descripcion}</Text>
 
                         <View style={styles.statusBadge}>
                             <Text style={styles.statusText}>
-                                {event.status.toUpperCase()}
+                                {editableEvent.status ? editableEvent.status.toUpperCase() : ''}
                             </Text>
                         </View>
 
@@ -960,195 +623,80 @@ export default function EventDetailScreen() {
                         <View style={styles.infoRow}>
                             <Ionicons name="calendar" size={18} color="rgb(71, 25, 82)" />
                             <Text style={styles.infoText}>
-                                Inicio: {formatDate(event.fechaInicio)}
+                                Inicio: {editableEvent.fechaInicio ? formatDate(editableEvent.fechaInicio) : 'Fecha no disponible'}
                             </Text>
                         </View>
 
-                        {event.fechaFin && (
+                        {editableEvent.fechaFin && (
                             <View style={styles.infoRow}>
                                 <Ionicons name="time" size={18} color="rgb(71, 25, 82)" />
                                 <Text style={styles.infoText}>
-                                    Fin: {formatDate(event.fechaFin)}
+                                    Fin: {editableEvent.fechaFin ? formatDate(editableEvent.fechaFin) : 'Fecha no disponible'}
                                 </Text>
                             </View>
                         )}
 
                         <View style={styles.infoRow}>
                             <Ionicons name="location" size={18} color="rgb(71, 25, 82)" />
-                            <Text style={styles.infoText}>{event.ubicacion.address}</Text>
+                            <Text style={styles.infoText}>{editableEvent.ubicacion?.address || 'Dirección no disponible'}</Text>
                         </View>
 
                         <View style={styles.infoRow}>
                             <Ionicons name="people" size={18} color="rgb(71, 25, 82)" />
                             <Text style={styles.infoText}>
-                                {event.cantidadInvitados} invitados esperados, {event.invitados.length} registrados
+                                {editableEvent.cantidadInvitados} invitados esperados, {editableEvent.invitados?.length || 0} registrados
                             </Text>
                         </View>
 
-                        {event.requiresPayment && event.cuotaAmount && (
+                        {editableEvent.requiresPayment && editableEvent.cuotaAmount && (
                             <View style={styles.infoRow}>
                                 <Ionicons name="cash" size={18} color="rgb(71, 25, 82)" />
                                 <Text style={styles.infoText}>
-                                    Cuota: ${event.cuotaAmount} por persona
+                                    Cuota: ${editableEvent.cuotaAmount} por persona
                                 </Text>
                             </View>
                         )}
 
-                        {event.requerimientos && (
+                        {editableEvent.requerimientos && (
                             <View style={styles.requirementsSection}>
                                 <Text style={styles.requirementsTitle}>Requerimientos:</Text>
 
-                                {event.requerimientos.codigoVestimenta && (
+                                {editableEvent.requerimientos.codigoVestimenta && (
                                     <View style={styles.requirementRow}>
                                         <Ionicons name="shirt" size={16} color="#666" />
                                         <Text style={styles.requirementText}>
-                                            Código de vestimenta: {event.requerimientos.codigoVestimenta}
+                                            Código de vestimenta: {editableEvent.requerimientos.codigoVestimenta}
                                         </Text>
                                     </View>
                                 )}
 
-                                {event.requerimientos.alimentacion && (
+                                {editableEvent.requerimientos.alimentacion && (
                                     <View style={styles.requirementRow}>
                                         <Ionicons name="restaurant" size={16} color="#666" />
                                         <Text style={styles.requirementText}>
-                                            Alimentación: {event.requerimientos.alimentacion}
+                                            Alimentación: {editableEvent.requerimientos.alimentacion}
                                         </Text>
                                     </View>
                                 )}
 
-                                {event.requerimientos.edadMinima && (
+                                {editableEvent.requerimientos.edadMinima && (
                                     <View style={styles.requirementRow}>
                                         <Ionicons name="person" size={16} color="#666" />
                                         <Text style={styles.requirementText}>
-                                            Edad mínima: {event.requerimientos.edadMinima}
+                                            Edad mínima: {editableEvent.requerimientos.edadMinima}
                                         </Text>
                                     </View>
                                 )}
 
-                                {event.requerimientos.llevar && (
+                                {editableEvent.requerimientos.llevar && (
                                     <View style={styles.requirementRow}>
                                         <Ionicons name="bag" size={16} color="#666" />
                                         <Text style={styles.requirementText}>
-                                            Llevar: {event.requerimientos.llevar}
+                                            Llevar: {editableEvent.requerimientos.llevar}
                                         </Text>
                                     </View>
                                 )}
                             </View>
-                        )}
-                    </View>
-
-                    {/* Sección de WhatsApp */}
-                    <View style={styles.whatsappSection}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Grupo de WhatsApp</Text>
-                            {!event.whatsappGroupId && (
-                                <TouchableOpacity
-                                    style={styles.addButton}
-                                    onPress={() => setWhatsappModalVisible(true)}
-                                >
-                                    <Text style={styles.addButtonText}>+ Crear Grupo</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        {event.whatsappGroupId ? (
-                            <View style={styles.whatsappCard}>
-                                <View style={styles.whatsappInfo}>
-                                    <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
-                                    <Text style={styles.whatsappText}>
-                                        Grupo activo para este evento
-                                    </Text>
-                                </View>
-
-                                <TouchableOpacity
-                                    style={styles.whatsappButton}
-                                    onPress={() => Linking.openURL(`https://wa.me/?text=¡Te invito a unirte al grupo para ${event.nombre}!`)}
-                                >
-                                    <Text style={styles.whatsappButtonText}>Abrir WhatsApp</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <Text style={styles.emptyText}>
-                                No hay grupo de WhatsApp creado para este evento.
-                            </Text>
-                        )}
-                    </View>
-
-                    {/* Sección de Encuestas */}
-                    {token && <PollSection event={event} token={token} onRefresh={handleRefresh} />}
-
-                    {/* Sección de Invitados */}
-                    <View style={styles.guestsSection}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Invitados</Text>
-                            <TouchableOpacity
-                                style={styles.addButton}
-                                onPress={() => setInviteModalVisible(true)}
-                            >
-                                <Text style={styles.addButtonText}>+ Invitar</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {event.invitados.length > 0 ? (
-                            event.invitados.map((invitado, index) => (
-                                <View key={index} style={styles.guestCard}>
-                                    <View style={styles.guestInfo}>
-                                        <Text style={styles.guestPhone}>{invitado.phone}</Text>
-                                        <View style={[
-                                            styles.guestStatusBadge,
-                                            invitado.status === 'confirmed' ? styles.confirmedStatus :
-                                                invitado.status === 'declined' ? styles.declinedStatus :
-                                                    styles.pendingStatus
-                                        ]}>
-                                            <Text style={styles.guestStatusText}>
-                                                {invitado.status === 'confirmed' ? 'CONFIRMADO' :
-                                                    invitado.status === 'declined' ? 'RECHAZADO' :
-                                                        invitado.status === 'registered' ? 'REGISTRADO' : 'PENDIENTE'}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.guestActions}>
-                                        {event.requiresPayment && (
-                                            invitado.hasPaid ? (
-                                                <View style={styles.paidBadge}>
-                                                    <Ionicons name="checkmark-circle" size={18} color="#ffffff" />
-                                                    <Text style={styles.paidText}>PAGADO</Text>
-                                                </View>
-                                            ) : (
-                                                <View style={styles.guestActionButtons}>
-                                                    <TouchableOpacity
-                                                        style={styles.actionButton}
-                                                        onPress={() => {
-                                                            setSelectedPhone(invitado.phone);
-                                                            setPaymentConcept(`Cuota para ${event.nombre}`);
-                                                            setShowPaymentModal(true);
-                                                        }}
-                                                    >
-                                                        <Ionicons name="cash-outline" size={18} color="rgb(71, 25, 82)" />
-                                                    </TouchableOpacity>
-
-                                                    <TouchableOpacity
-                                                        style={styles.actionButton}
-                                                        onPress={() => handleMarkAsPaid(invitado.phone)}
-                                                    >
-                                                        <Ionicons name="checkmark-circle-outline" size={18} color="rgb(71, 25, 82)" />
-                                                    </TouchableOpacity>
-                                                </View>
-                                            )
-                                        )}
-
-                                        <TouchableOpacity
-                                            style={styles.actionButton}
-                                            onPress={() => handleRemoveGuest(invitado.phone)}
-                                        >
-                                            <Ionicons name="close-circle-outline" size={18} color="#ff4646" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            ))
-                        ) : (
-                            <Text style={styles.emptyText}>No hay invitados registrados</Text>
                         )}
                     </View>
                 </ScrollView>
@@ -1160,7 +708,7 @@ export default function EventDetailScreen() {
         <>
             <Stack.Screen
                 options={{
-                    headerTitle: isEditing ? 'Editar Evento' : event.nombre,
+                    headerTitle: isEditing ? 'Editar Evento' : editableEvent.nombre,
                     headerShown: true,
                     headerTintColor: 'rgb(51, 18, 59)',
                 }}
@@ -1168,148 +716,6 @@ export default function EventDetailScreen() {
 
             <View style={styles.container}>
                 {renderContent()}
-
-                {/* Modal para invitar */}
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={inviteModalVisible}
-                    onRequestClose={() => setInviteModalVisible(false)}
-                >
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Invitar Persona</Text>
-
-                            {inviteError ? (
-                                <Text style={styles.errorText}>{inviteError}</Text>
-                            ) : null}
-
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Número de teléfono (con código de país)"
-                                placeholderTextColor="#666"
-                                value={newPhone}
-                                onChangeText={setNewPhone}
-                                keyboardType="phone-pad"
-                            />
-
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.cancelButton]}
-                                    onPress={() => setInviteModalVisible(false)}
-                                >
-                                    <Text style={styles.cancelButtonText}>Cancelar</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.inviteButton]}
-                                    onPress={handleInvite}
-                                    disabled={isLoading}
-                                >
-                                    {isLoading ? (
-                                        <ActivityIndicator size="small" color="#ffffff" />
-                                    ) : (
-                                        <Text style={styles.inviteButtonText}>Invitar</Text>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
-
-                {/* Modal para crear grupo de WhatsApp */}
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={whatsappModalVisible}
-                    onRequestClose={() => setWhatsappModalVisible(false)}
-                >
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Crear Grupo de WhatsApp</Text>
-
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Nombre del grupo"
-                                placeholderTextColor="#666"
-                                value={groupName}
-                                onChangeText={setGroupName}
-                            />
-
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.cancelButton]}
-                                    onPress={() => setWhatsappModalVisible(false)}
-                                >
-                                    <Text style={styles.cancelButtonText}>Cancelar</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.inviteButton]}
-                                    onPress={handleCreateWhatsappGroup}
-                                    disabled={isLoading}
-                                >
-                                    {isLoading ? (
-                                        <ActivityIndicator size="small" color="#ffffff" />
-                                    ) : (
-                                        <Text style={styles.inviteButtonText}>Crear Grupo</Text>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
-
-                {/* Modal para solicitar pago */}
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={showPaymentModal}
-                    onRequestClose={() => setShowPaymentModal(false)}
-                >
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Solicitar Pago</Text>
-
-                            <Text style={styles.paymentModalSubtitle}>
-                                Solicitando pago a: {selectedPhone}
-                            </Text>
-
-                            <Text style={styles.paymentModalSubtitle}>
-                                Monto: ${event.cuotaAmount}
-                            </Text>
-
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Concepto del pago (opcional)"
-                                placeholderTextColor="#666"
-                                value={paymentConcept}
-                                onChangeText={setPaymentConcept}
-                            />
-
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.cancelButton]}
-                                    onPress={() => setShowPaymentModal(false)}
-                                >
-                                    <Text style={styles.cancelButtonText}>Cancelar</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.inviteButton]}
-                                    onPress={handleRequestPayment}
-                                    disabled={isLoading}
-                                >
-                                    {isLoading ? (
-                                        <ActivityIndicator size="small" color="#ffffff" />
-                                    ) : (
-                                        <Text style={styles.inviteButtonText}>Solicitar Pago</Text>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
             </View>
         </>
     );
