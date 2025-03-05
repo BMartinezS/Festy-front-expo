@@ -20,9 +20,11 @@ import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { eventService, EventToUpdate } from '@/services/event.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import MapSection from '@/components/EventForm/MapSection';
 import ProductSearchSection from '@/components/EventForm/ProductSearchSection';
+import { paymentService } from '@/services/payment.service';
 
 // Componente principal de detalle del evento
 export default function EventDetailScreen() {
@@ -124,7 +126,9 @@ export default function EventDetailScreen() {
 
             if (!token || !id) throw new Error('No hay sesión activa');
 
-            await eventService.updateEvent(token, id as string, event);
+            console.log('editableEvent:', editableEvent);
+
+            await eventService.updateEvent(token, id as string, editableEvent);
             await handleRefresh();
             setIsEditing(false);
 
@@ -138,6 +142,7 @@ export default function EventDetailScreen() {
 
     // Función para manejar los cambios en los campos del evento
     const handleEventChange = (field: keyof EventToUpdate, value: any) => {
+        console.log('En event change: ', field, value);
         seteditableEvent((prev: any) => ({ ...prev, [field]: value }));
     };
 
@@ -425,7 +430,7 @@ export default function EventDetailScreen() {
                             }
                         />
 
-                        <ProductSearchSection form={event} updateForm={handleEventChange} setError={setError} />
+                        <ProductSearchSection isEditing={true} form={event} updateForm={handleEventChange} setError={setError} />
 
                         {/* Requerimientos */}
                         <View style={styles.editSection}>
@@ -522,6 +527,59 @@ export default function EventDetailScreen() {
                             <Ionicons name="trash" size={20} color="#fff" />
                             <Text style={styles.deleteEventText}>Eliminar Evento</Text>
                         </TouchableOpacity>
+
+                        <View style={styles.actionButtonsContainer}>
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={() => router.push(`/event/${event._id.toString()}/dashboard`)}
+                            >
+                                <Ionicons name="stats-chart" size={24} color="#ffffff" />
+                                <Text style={styles.actionButtonText}>Dashboard</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={() => router.push(`/event/${event._id.toString()}/guests`)}
+                            >
+                                <Ionicons name="people" size={24} color="#ffffff" />
+                                <Text style={styles.actionButtonText}>Gestionar Invitados</Text>
+                            </TouchableOpacity>
+
+                            {editableEvent.requiresPayment && (
+                                <TouchableOpacity
+                                    style={styles.actionButton}
+                                    onPress={async () => {
+                                        try {
+                                            let paymentLink = '';
+                                            if (token) {
+                                                paymentLink = await paymentService.generatePaymentLink(token, event._id.toString());
+                                            } else {
+                                                throw new Error('Token is null');
+                                            }
+                                            Alert.alert(
+                                                'Enlace de Pago',
+                                                'Enlace generado correctamente. Puedes compartirlo con tus invitados.',
+                                                [
+                                                    {
+                                                        text: 'Copiar Enlace',
+                                                        onPress: async () => {
+                                                            await Clipboard.setStringAsync(paymentLink);
+                                                            Alert.alert('Éxito', 'Enlace copiado al portapapeles');
+                                                        },
+                                                    },
+                                                    { text: 'Cerrar' }
+                                                ]
+                                            );
+                                        } catch (error) {
+                                            Alert.alert('Error', 'No se pudo generar el enlace de pago');
+                                        }
+                                    }}
+                                >
+                                    <Ionicons name="cash" size={24} color="#ffffff" />
+                                    <Text style={styles.actionButtonText}>Generar Enlace de Pago</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     </ScrollView>
 
                     {/* Modal para seleccionar/tomar imagen */}
@@ -1292,5 +1350,15 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: 'bold',
         marginLeft: 4,
-    }
+    },
+    actionButtonsContainer: {
+        marginTop: 20,
+        marginBottom: 10,
+        gap: 10,
+    },
+    actionButtonText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: '500',
+    },
 });

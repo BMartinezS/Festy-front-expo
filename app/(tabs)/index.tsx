@@ -44,6 +44,10 @@ export default function HomeScreen() {
           onPress={() => router.push('/event')}
           title="Panel de Administración"
         />
+        <Button
+          onPress={() => router.push('/guest')}
+          title="Pantalla de pago"
+        />
         <CleanTokenButton></CleanTokenButton>
         <ThemedText type="title">HOla!</ThemedText>
         <HelloWave />
