@@ -4,7 +4,6 @@ import {
     StyleSheet,
     View,
     Text,
-    ScrollView,
     TouchableOpacity,
     RefreshControl,
     TextInput,
@@ -15,6 +14,8 @@ import {
     Platform,
     KeyboardAvoidingView,
     Switch,
+    StatusBar,
+    Animated,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { eventService, EventToUpdate } from '@/services/event.service';
@@ -25,6 +26,9 @@ import * as ImagePicker from 'expo-image-picker';
 import MapSection from '@/components/EventForm/MapSection';
 import ProductSearchSection from '@/components/EventForm/ProductSearchSection';
 import { paymentService } from '@/services/payment.service';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import ActionButton from '@/components/ui/ActionButton';
 
 // Componente principal de detalle del evento
 export default function EventDetailScreen() {
@@ -112,11 +116,10 @@ export default function EventDetailScreen() {
 
     // Función para guardar los cambios del evento
     const handleSaveChanges = async () => {
-
         if (!event) return;
 
         if (!editableEvent.nombre || !editableEvent.fechaInicio) {
-            Alert.alert('Error', 'El nombre y la fecha de inicio son obligatorios');
+            Alert.alert('Campos requeridos', 'El nombre y la fecha de inicio son obligatorios');
             return;
         }
 
@@ -131,8 +134,7 @@ export default function EventDetailScreen() {
             await eventService.updateEvent(token, id as string, editableEvent);
             await handleRefresh();
             setIsEditing(false);
-
-            Alert.alert('Éxito', 'Evento actualizado correctamente');
+            Alert.alert('¡Listo!', 'Evento actualizado correctamente');
         } catch (error: any) {
             setError(error.message || 'Error al actualizar el evento');
         } finally {
@@ -252,15 +254,27 @@ export default function EventDetailScreen() {
     if (!event) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="rgb(51, 18, 59)" />
+                <ActivityIndicator size="large" color="#6a0dad" />
                 <Text style={styles.loadingText}>Cargando evento...</Text>
             </View>
         );
     }
 
+
     const formatDate = (date: Date) => {
         const d = new Date(date);
         return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    };
+
+    // Función que determina el color del estado
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'active': return '#28a745';
+            case 'completed': return '#6c757d';
+            case 'cancelled': return '#dc3545';
+            case 'draft': return '#ffc107';
+            default: return '#6a0dad';
+        }
     };
 
     // Renderizar modo de visualización o edición
@@ -272,12 +286,24 @@ export default function EventDetailScreen() {
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={{ flex: 1 }}
                 >
-                    <ScrollView
+                    <StatusBar barStyle="light-content" backgroundColor="#6a0dad" />
+
+                    <Animated.ScrollView
                         refreshControl={
-                            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={handleRefresh}
+                                colors={['#6a0dad']}
+                                tintColor="#6a0dad"
+                            />
                         }
                     >
-                        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                        {error ? (
+                            <View style={styles.errorContainer}>
+                                <Ionicons name="alert-circle" size={24} color="#ff4646" />
+                                <Text style={styles.errorText}>{error}</Text>
+                            </View>
+                        ) : null}
 
                         {/* Editor de imagen */}
                         <TouchableOpacity
@@ -292,12 +318,22 @@ export default function EventDetailScreen() {
                                 />
                             ) : (
                                 <View style={styles.imagePlaceholder}>
-                                    <Ionicons name="image" size={40} color="#aaa" />
-                                    <Text style={styles.imagePlaceholderText}>Toca para añadir imagen</Text>
+                                    <LinearGradient
+                                        colors={['#8e44ad', '#6a0dad']}
+                                        style={styles.gradientPlaceholder}
+                                    >
+                                        <Ionicons name="image" size={40} color="rgba(255,255,255,0.8)" />
+                                        <Text style={styles.imagePlaceholderText}>Toca para añadir imagen</Text>
+                                    </LinearGradient>
                                 </View>
                             )}
                             <View style={styles.imageEditOverlay}>
-                                <Ionicons name="camera" size={24} color="#ffffff" />
+                                <LinearGradient
+                                    colors={['#6a0dad', '#8e44ad']}
+                                    style={styles.editIconGradient}
+                                >
+                                    <Ionicons name="camera" size={20} color="#ffffff" />
+                                </LinearGradient>
                             </View>
                         </TouchableOpacity>
 
@@ -306,116 +342,60 @@ export default function EventDetailScreen() {
                             <Text style={styles.editSectionTitle}>Información Básica</Text>
 
                             <Text style={styles.inputLabel}>Nombre del Evento*</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={editableEvent.nombre}
-                                onChangeText={(text) => handleEventChange('nombre', text)}
-                                placeholder="Nombre del evento"
-                            />
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="text" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={editableEvent.nombre}
+                                    onChangeText={(text) => handleEventChange('nombre', text)}
+                                    placeholder="Nombre del evento"
+                                    placeholderTextColor="#aaa"
+                                />
+                            </View>
 
                             <Text style={styles.inputLabel}>Descripción</Text>
-                            <TextInput
-                                style={[styles.textInput, styles.textArea]}
-                                value={editableEvent.descripcion}
-                                onChangeText={(text) => handleEventChange('descripcion', text)}
-                                placeholder="Descripción del evento"
-                                multiline
-                                numberOfLines={4}
-                                textAlignVertical="top"
-                            />
+                            <View style={[styles.inputContainer, { alignItems: 'flex-start' }]}>
+                                <Ionicons name="document-text" size={20} color="#8e44ad" style={[styles.inputIcon, { marginTop: 10 }]} />
+                                <TextInput
+                                    style={[styles.textInput, styles.textArea]}
+                                    value={editableEvent.descripcion}
+                                    onChangeText={(text) => handleEventChange('descripcion', text)}
+                                    placeholder="Descripción del evento"
+                                    placeholderTextColor="#aaa"
+                                    multiline
+                                    numberOfLines={4}
+                                    textAlignVertical="top"
+                                />
+                            </View>
 
                             <Text style={styles.inputLabel}>Tipo de Evento*</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={editableEvent.tipo}
-                                onChangeText={(text) => handleEventChange('tipo', text)}
-                                placeholder="Tipo de evento"
-                            />
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="pricetag" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={editableEvent.tipo}
+                                    onChangeText={(text) => handleEventChange('tipo', text)}
+                                    placeholder="Tipo de evento"
+                                    placeholderTextColor="#aaa"
+                                />
+                            </View>
 
                             <Text style={styles.inputLabel}>Cantidad de Invitados</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={editableEvent.cantidadInvitados?.toString()}
-                                onChangeText={(text) => handleEventChange('cantidadInvitados', parseInt(text) || 0)}
-                                placeholder="Cantidad de invitados"
-                                keyboardType="number-pad"
-                            />
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="people" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={editableEvent.cantidadInvitados?.toString()}
+                                    onChangeText={(text) => handleEventChange('cantidadInvitados', parseInt(text) || 0)}
+                                    placeholder="Cantidad de invitados"
+                                    placeholderTextColor="#aaa"
+                                    keyboardType="number-pad"
+                                />
+                            </View>
                         </View>
 
                         {/* Fechas */}
-                        {/* <View style={styles.editSection}>
-                            <Text style={styles.editSectionTitle}>Fechas</Text>
-
-                            <Text style={styles.inputLabel}>Fecha y Hora de Inicio*</Text>
-                            <TouchableOpacity
-                                style={styles.datePickerButton}
-                                onPress={() => {
-                                    if (Platform.OS === 'android') {
-                                        DateTimePickerAndroid.open({
-                                            value: editableEvent.fechaInicio || new Date(),
-                                            onChange: (event, date) => {
-                                                if (date) handleDateChange('fechaInicio', date);
-                                            },
-                                            mode: 'datetime'
-                                        });
-                                    } else {
-                                        setShowDatePickerStart(true);
-                                    }
-                                }}
-                            >
-                                <Text style={styles.datePickerText}>
-                                    {editableEvent.fechaInicio ? formatDate(editableEvent.fechaInicio) : "Seleccionar fecha y hora"}
-                                </Text>
-                                <Ionicons name="calendar" size={20} color="rgb(71, 25, 82)" />
-                            </TouchableOpacity>
-
-                            <Text style={styles.inputLabel}>Fecha y Hora de Fin</Text>
-                            <TouchableOpacity
-                                style={styles.datePickerButton}
-                                onPress={() => {
-                                    if (Platform.OS === 'android') {
-                                        DateTimePickerAndroid.open({
-                                            value: editableEvent.fechaFin || new Date(),
-                                            onChange: (event, date) => {
-                                                if (date) handleDateChange('fechaFin', date);
-                                            },
-                                            mode: 'datetime'
-                                        });
-                                    } else {
-                                        setShowDatePickerEnd(true);
-                                    }
-                                }}
-                            >
-                                <Text style={styles.datePickerText}>
-                                    {editableEvent.fechaFin ? formatDate(editableEvent.fechaFin) : "Seleccionar fecha y hora (opcional)"}
-                                </Text>
-                                <Ionicons name="calendar" size={20} color="rgb(71, 25, 82)" />
-                            </TouchableOpacity>
-
-                            {Platform.OS === 'ios' && showDatePickerStart && (
-                                <DateTimePickerIOS
-                                    value={editableEvent.fechaInicio || new Date()}
-                                    mode="datetime"
-                                    display="spinner"
-                                    onChange={(event, date) => {
-                                        if (date) handleDateChange('fechaInicio', date);
-                                    }}
-                                    style={styles.iOSDatePicker}
-                                />
-                            )}
-
-                            {Platform.OS === 'ios' && showDatePickerEnd && (
-                                <DateTimePickerIOS
-                                    value={editableEvent.fechaFin || new Date()}
-                                    mode="datetime"
-                                    display="spinner"
-                                    onChange={(event, date) => {
-                                        if (date) handleDateChange('fechaFin', date);
-                                    }}
-                                    style={styles.iOSDatePicker}
-                                />
-                            )}
-                        </View> */}
+                        {/* [Omitido el código de DatePicker por brevedad] */}
 
                         <MapSection
                             initialCoordinates={{
@@ -437,36 +417,52 @@ export default function EventDetailScreen() {
                             <Text style={styles.editSectionTitle}>Requerimientos</Text>
 
                             <Text style={styles.inputLabel}>Código de Vestimenta</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={editableEvent.requerimientos?.codigoVestimenta}
-                                onChangeText={(text) => handleRequirementChange('codigoVestimenta', text)}
-                                placeholder="Código de vestimenta"
-                            />
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="shirt" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={editableEvent.requerimientos?.codigoVestimenta}
+                                    onChangeText={(text) => handleRequirementChange('codigoVestimenta', text)}
+                                    placeholder="Código de vestimenta"
+                                    placeholderTextColor="#aaa"
+                                />
+                            </View>
 
                             <Text style={styles.inputLabel}>Alimentación</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={editableEvent.requerimientos?.alimentacion}
-                                onChangeText={(text) => handleRequirementChange('alimentacion', text)}
-                                placeholder="Información sobre alimentación"
-                            />
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="restaurant" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={editableEvent.requerimientos?.alimentacion}
+                                    onChangeText={(text) => handleRequirementChange('alimentacion', text)}
+                                    placeholder="Información sobre alimentación"
+                                    placeholderTextColor="#aaa"
+                                />
+                            </View>
 
                             <Text style={styles.inputLabel}>Edad Mínima</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={editableEvent.requerimientos?.edadMinima}
-                                onChangeText={(text) => handleRequirementChange('edadMinima', text)}
-                                placeholder="Edad mínima requerida"
-                            />
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="person" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={editableEvent.requerimientos?.edadMinima}
+                                    onChangeText={(text) => handleRequirementChange('edadMinima', text)}
+                                    placeholder="Edad mínima requerida"
+                                    placeholderTextColor="#aaa"
+                                />
+                            </View>
 
                             <Text style={styles.inputLabel}>Llevar</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                value={editableEvent.requerimientos?.llevar}
-                                onChangeText={(text) => handleRequirementChange('llevar', text)}
-                                placeholder="Qué deben llevar los invitados"
-                            />
+                            <View style={styles.inputContainer}>
+                                <Ionicons name="bag" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={editableEvent.requerimientos?.llevar}
+                                    onChangeText={(text) => handleRequirementChange('llevar', text)}
+                                    placeholder="Qué deben llevar los invitados"
+                                    placeholderTextColor="#aaa"
+                                />
+                            </View>
                         </View>
 
                         {/* Pago */}
@@ -474,25 +470,33 @@ export default function EventDetailScreen() {
                             <Text style={styles.editSectionTitle}>Información de Pago</Text>
 
                             <View style={styles.switchContainer}>
-                                <Text style={styles.switchLabel}>Requiere Pago</Text>
+                                <View style={styles.switchLabelContainer}>
+                                    <Ionicons name="cash" size={20} color="#8e44ad" />
+                                    <Text style={styles.switchLabel}>Requiere Pago</Text>
+                                </View>
                                 <Switch
                                     value={editableEvent.requiresPayment}
                                     onValueChange={(value) => handleEventChange('requiresPayment', value)}
-                                    trackColor={{ false: '#d0d0d0', true: 'rgb(71, 25, 82)' }}
-                                    thumbColor={editableEvent.requiresPayment ? 'rgb(51, 18, 59)' : '#f4f3f4'}
+                                    trackColor={{ false: '#d0d0d0', true: '#9b59b6' }}
+                                    thumbColor={editableEvent.requiresPayment ? '#6a0dad' : '#f4f3f4'}
+                                    ios_backgroundColor="#d0d0d0"
                                 />
                             </View>
 
                             {editableEvent.requiresPayment && (
                                 <>
                                     <Text style={styles.inputLabel}>Monto de Cuota</Text>
-                                    <TextInput
-                                        style={styles.textInput}
-                                        value={editableEvent.cuotaAmount?.toString()}
-                                        onChangeText={(text) => handleEventChange('cuotaAmount', parseFloat(text) || 0)}
-                                        placeholder="Monto de la cuota"
-                                        keyboardType="numeric"
-                                    />
+                                    <View style={styles.inputContainer}>
+                                        <Ionicons name="cash" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={styles.textInput}
+                                            value={editableEvent.cuotaAmount?.toString()}
+                                            onChangeText={(text) => handleEventChange('cuotaAmount', parseFloat(text) || 0)}
+                                            placeholder="Monto de la cuota"
+                                            placeholderTextColor="#aaa"
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
                                 </>
                             )}
                         </View>
@@ -524,30 +528,37 @@ export default function EventDetailScreen() {
                             style={styles.deleteEventButton}
                             onPress={handleDeleteEvent}
                         >
-                            <Ionicons name="trash" size={20} color="#fff" />
-                            <Text style={styles.deleteEventText}>Eliminar Evento</Text>
+                            <LinearGradient
+                                colors={['#ff4646', '#d32f2f']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.deleteGradient}
+                            >
+                                <Ionicons name="trash" size={20} color="#fff" />
+                                <Text style={styles.deleteEventText}>Eliminar Evento</Text>
+                            </LinearGradient>
                         </TouchableOpacity>
 
                         <View style={styles.actionButtonsContainer}>
-                            <TouchableOpacity
-                                style={styles.actionButton}
+                            <ActionButton
+                                icon="stats-chart"
+                                title="Dashboard"
                                 onPress={() => router.push(`/event/${event._id.toString()}/dashboard`)}
-                            >
-                                <Ionicons name="stats-chart" size={24} color="#ffffff" />
-                                <Text style={styles.actionButtonText}>Dashboard</Text>
-                            </TouchableOpacity>
+                                color="#6a0dad"
+                            />
 
-                            <TouchableOpacity
-                                style={styles.actionButton}
+                            <ActionButton
+                                icon="people"
+                                title="Gestionar Invitados"
                                 onPress={() => router.push(`/event/${event._id.toString()}/guests`)}
-                            >
-                                <Ionicons name="people" size={24} color="#ffffff" />
-                                <Text style={styles.actionButtonText}>Gestionar Invitados</Text>
-                            </TouchableOpacity>
+                                color="#8e44ad"
+                            />
 
                             {editableEvent.requiresPayment && (
-                                <TouchableOpacity
-                                    style={styles.actionButton}
+                                <ActionButton
+                                    color="#ff4646"
+                                    icon="cash"
+                                    title="Generar Enlace de Pago"
                                     onPress={async () => {
                                         try {
                                             let paymentLink = '';
@@ -574,13 +585,10 @@ export default function EventDetailScreen() {
                                             Alert.alert('Error', 'No se pudo generar el enlace de pago');
                                         }
                                     }}
-                                >
-                                    <Ionicons name="cash" size={24} color="#ffffff" />
-                                    <Text style={styles.actionButtonText}>Generar Enlace de Pago</Text>
-                                </TouchableOpacity>
+                                />
                             )}
                         </View>
-                    </ScrollView>
+                    </Animated.ScrollView>
 
                     {/* Modal para seleccionar/tomar imagen */}
                     <Modal
@@ -590,6 +598,7 @@ export default function EventDetailScreen() {
                         onRequestClose={() => setShowImagePickerModal(false)}
                     >
                         <View style={styles.modalContainer}>
+                            <BlurView intensity={90} style={styles.blurView} tint="dark" />
                             <View style={styles.modalContent}>
                                 <Text style={styles.modalTitle}>Cambiar Imagen</Text>
 
@@ -597,7 +606,9 @@ export default function EventDetailScreen() {
                                     style={styles.imagePickerOption}
                                     onPress={pickImage}
                                 >
-                                    <Ionicons name="images" size={24} color="rgb(71, 25, 82)" />
+                                    <View style={styles.iconCircle}>
+                                        <Ionicons name="images" size={24} color="#6a0dad" />
+                                    </View>
                                     <Text style={styles.imagePickerOptionText}>Seleccionar de la galería</Text>
                                 </TouchableOpacity>
 
@@ -605,7 +616,9 @@ export default function EventDetailScreen() {
                                     style={styles.imagePickerOption}
                                     onPress={takePhoto}
                                 >
-                                    <Ionicons name="camera" size={24} color="rgb(71, 25, 82)" />
+                                    <View style={styles.iconCircle}>
+                                        <Ionicons name="camera" size={24} color="#6a0dad" />
+                                    </View>
                                     <Text style={styles.imagePickerOptionText}>Tomar foto</Text>
                                 </TouchableOpacity>
 
@@ -617,16 +630,18 @@ export default function EventDetailScreen() {
                                             setShowImagePickerModal(false);
                                         }}
                                     >
-                                        <Ionicons name="trash" size={24} color="#ff4646" />
+                                        <View style={[styles.iconCircle, styles.deleteIconCircle]}>
+                                            <Ionicons name="trash" size={24} color="#fff" />
+                                        </View>
                                         <Text style={styles.removeImageText}>Eliminar imagen</Text>
                                     </TouchableOpacity>
                                 )}
 
                                 <TouchableOpacity
-                                    style={[styles.modalButton, styles.cancelButton, { marginTop: 15 }]}
+                                    style={styles.modalCloseButton}
                                     onPress={() => setShowImagePickerModal(false)}
                                 >
-                                    <Text style={styles.cancelButtonText}>Cancelar</Text>
+                                    <Text style={styles.modalCloseText}>Cancelar</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -636,131 +651,271 @@ export default function EventDetailScreen() {
         } else {
             // MODO VISUALIZACIÓN
             return (
-                <ScrollView
+                <Animated.ScrollView
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            colors={['#6a0dad']}
+                            tintColor="#6a0dad"
+                        />
                     }
                 >
-                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                    <StatusBar barStyle="light-content" backgroundColor="#6a0dad" />
+
+                    {error ? (
+                        <View style={styles.errorContainer}>
+                            <Ionicons name="alert-circle" size={24} color="#ff4646" />
+                            <Text style={styles.errorText}>{error}</Text>
+                        </View>
+                    ) : null}
 
                     {/* Cabecera del evento */}
                     <View style={styles.headerSection}>
-                        {editableEvent.imagen ? (
-                            <Image
-                                source={{ uri: editableEvent.imagen }}
-                                style={styles.eventImage}
-                                resizeMode="cover"
-                            />
-                        ) : (
-                            <View style={styles.imagePlaceholder}>
-                                <Ionicons name="calendar" size={40} color="#aaa" />
+                        <View style={styles.imageContainer}>
+                            {editableEvent.imagen ? (
+                                <Image
+                                    source={{ uri: editableEvent.imagen }}
+                                    style={styles.eventImage}
+                                    resizeMode="cover"
+                                />
+                            ) : (
+                                <LinearGradient
+                                    colors={['#8e44ad', '#6a0dad']}
+                                    style={styles.eventImagePlaceholder}
+                                >
+                                    <Ionicons name="calendar" size={50} color="rgba(255,255,255,0.8)" />
+                                </LinearGradient>
+                            )}
+
+                            {/* Badge de estado */}
+                            <View style={[
+                                styles.statusBadge,
+                                { backgroundColor: getStatusColor(editableEvent.status || '') }
+                            ]}>
+                                <Text style={styles.statusText}>
+                                    {editableEvent.status ? editableEvent.status.toUpperCase() : ''}
+                                </Text>
                             </View>
-                        )}
 
-                        <Text style={styles.description}>{editableEvent.descripcion}</Text>
-
-                        <View style={styles.statusBadge}>
-                            <Text style={styles.statusText}>
-                                {editableEvent.status ? editableEvent.status.toUpperCase() : ''}
-                            </Text>
+                            {/* Botón de editar */}
+                            <TouchableOpacity
+                                style={styles.editEventButton}
+                                onPress={handleStartEditing}
+                            >
+                                <LinearGradient
+                                    colors={['#6a0dad', '#8e44ad']}
+                                    style={styles.editButtonGradient}
+                                >
+                                    <Ionicons name="create" size={16} color="#ffffff" />
+                                    <Text style={styles.editEventText}>Editar</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
                         </View>
 
-                        {/* Botón de editar */}
-                        <TouchableOpacity
-                            style={styles.editEventButton}
-                            onPress={handleStartEditing}
-                        >
-                            <Ionicons name="create" size={16} color="#ffffff" />
-                            <Text style={styles.editEventText}>Editar</Text>
-                        </TouchableOpacity>
+                        <View style={styles.eventDetailsCard}>
+                            <Text style={styles.eventTitle}>{editableEvent.nombre}</Text>
+                            <Text style={styles.description}>{editableEvent.descripcion}</Text>
+                        </View>
                     </View>
 
                     {/* Información del evento */}
                     <View style={styles.infoCard}>
                         <Text style={styles.sectionTitle}>Detalles del Evento</Text>
-                        <View style={styles.infoRow}>
-                            <Ionicons name="calendar" size={18} color="rgb(71, 25, 82)" />
-                            <Text style={styles.infoText}>
-                                Inicio: {editableEvent.fechaInicio ? formatDate(editableEvent.fechaInicio) : 'Fecha no disponible'}
-                            </Text>
-                        </View>
 
-                        {editableEvent.fechaFin && (
+                        <View style={styles.detailsContainer}>
                             <View style={styles.infoRow}>
-                                <Ionicons name="time" size={18} color="rgb(71, 25, 82)" />
-                                <Text style={styles.infoText}>
-                                    Fin: {editableEvent.fechaFin ? formatDate(editableEvent.fechaFin) : 'Fecha no disponible'}
-                                </Text>
+                                <View style={styles.infoIconContainer}>
+                                    <Ionicons name="calendar" size={20} color="#fff" />
+                                </View>
+                                <View style={styles.infoTextContainer}>
+                                    <Text style={styles.infoLabel}>Inicio</Text>
+                                    <Text style={styles.infoText}>
+                                        {editableEvent.fechaInicio ? formatDate(editableEvent.fechaInicio) : 'Fecha no disponible'}
+                                    </Text>
+                                </View>
                             </View>
-                        )}
 
-                        <View style={styles.infoRow}>
-                            <Ionicons name="location" size={18} color="rgb(71, 25, 82)" />
-                            <Text style={styles.infoText}>{editableEvent.ubicacion?.address || 'Dirección no disponible'}</Text>
-                        </View>
+                            {editableEvent.fechaFin && (
+                                <View style={styles.infoRow}>
+                                    <View style={styles.infoIconContainer}>
+                                        <Ionicons name="time" size={20} color="#fff" />
+                                    </View>
+                                    <View style={styles.infoTextContainer}>
+                                        <Text style={styles.infoLabel}>Fin</Text>
+                                        <Text style={styles.infoText}>
+                                            {formatDate(editableEvent.fechaFin)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
 
-                        <View style={styles.infoRow}>
-                            <Ionicons name="people" size={18} color="rgb(71, 25, 82)" />
-                            <Text style={styles.infoText}>
-                                {editableEvent.cantidadInvitados} invitados esperados, {editableEvent.invitados?.length || 0} registrados
-                            </Text>
-                        </View>
-
-                        {editableEvent.requiresPayment && editableEvent.cuotaAmount && (
                             <View style={styles.infoRow}>
-                                <Ionicons name="cash" size={18} color="rgb(71, 25, 82)" />
-                                <Text style={styles.infoText}>
-                                    Cuota: ${editableEvent.cuotaAmount} por persona
-                                </Text>
+                                <View style={styles.infoIconContainer}>
+                                    <Ionicons name="location" size={20} color="#fff" />
+                                </View>
+                                <View style={styles.infoTextContainer}>
+                                    <Text style={styles.infoLabel}>Ubicación</Text>
+                                    <Text style={styles.infoText}>
+                                        {editableEvent.ubicacion?.address || 'Dirección no disponible'}
+                                    </Text>
+                                </View>
                             </View>
-                        )}
 
+                            <View style={styles.infoRow}>
+                                <View style={styles.infoIconContainer}>
+                                    <Ionicons name="people" size={20} color="#fff" />
+                                </View>
+                                <View style={styles.infoTextContainer}>
+                                    <Text style={styles.infoLabel}>Invitados</Text>
+                                    <Text style={styles.infoText}>
+                                        {editableEvent.cantidadInvitados} esperados, {editableEvent.invitados?.length || 0} registrados
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {editableEvent.requiresPayment && editableEvent.cuotaAmount && (
+                                <View style={styles.infoRow}>
+                                    <View style={styles.infoIconContainer}>
+                                        <Ionicons name="cash" size={20} color="#fff" />
+                                    </View>
+                                    <View style={styles.infoTextContainer}>
+                                        <Text style={styles.infoLabel}>Cuota</Text>
+                                        <Text style={styles.infoText}>
+                                            ${editableEvent.cuotaAmount} por persona
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Requerimientos */}
                         {editableEvent.requerimientos && (
                             <View style={styles.requirementsSection}>
                                 <Text style={styles.requirementsTitle}>Requerimientos:</Text>
 
-                                {editableEvent.requerimientos.codigoVestimenta && (
-                                    <View style={styles.requirementRow}>
-                                        <Ionicons name="shirt" size={16} color="#666" />
-                                        <Text style={styles.requirementText}>
-                                            Código de vestimenta: {editableEvent.requerimientos.codigoVestimenta}
-                                        </Text>
-                                    </View>
-                                )}
+                                <View style={styles.requirementsGrid}>
+                                    {editableEvent.requerimientos.codigoVestimenta && (
+                                        <View style={styles.requirementItem}>
+                                            <View style={styles.requirementIconContainer}>
+                                                <Ionicons name="shirt" size={18} color="#fff" />
+                                            </View>
+                                            <View>
+                                                <Text style={styles.requirementLabel}>Código de vestimenta</Text>
+                                                <Text style={styles.requirementText}>
+                                                    {editableEvent.requerimientos.codigoVestimenta}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
 
-                                {editableEvent.requerimientos.alimentacion && (
-                                    <View style={styles.requirementRow}>
-                                        <Ionicons name="restaurant" size={16} color="#666" />
-                                        <Text style={styles.requirementText}>
-                                            Alimentación: {editableEvent.requerimientos.alimentacion}
-                                        </Text>
-                                    </View>
-                                )}
+                                    {editableEvent.requerimientos.alimentacion && (
+                                        <View style={styles.requirementItem}>
+                                            <View style={styles.requirementIconContainer}>
+                                                <Ionicons name="restaurant" size={18} color="#fff" />
+                                            </View>
+                                            <View>
+                                                <Text style={styles.requirementLabel}>Alimentación</Text>
+                                                <Text style={styles.requirementText}>
+                                                    {editableEvent.requerimientos.alimentacion}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
 
-                                {editableEvent.requerimientos.edadMinima && (
-                                    <View style={styles.requirementRow}>
-                                        <Ionicons name="person" size={16} color="#666" />
-                                        <Text style={styles.requirementText}>
-                                            Edad mínima: {editableEvent.requerimientos.edadMinima}
-                                        </Text>
-                                    </View>
-                                )}
+                                    {editableEvent.requerimientos.edadMinima && (
+                                        <View style={styles.requirementItem}>
+                                            <View style={styles.requirementIconContainer}>
+                                                <Ionicons name="person" size={18} color="#fff" />
+                                            </View>
+                                            <View>
+                                                <Text style={styles.requirementLabel}>Edad mínima</Text>
+                                                <Text style={styles.requirementText}>
+                                                    {editableEvent.requerimientos.edadMinima}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
 
-                                {editableEvent.requerimientos.llevar && (
-                                    <View style={styles.requirementRow}>
-                                        <Ionicons name="bag" size={16} color="#666" />
-                                        <Text style={styles.requirementText}>
-                                            Llevar: {editableEvent.requerimientos.llevar}
-                                        </Text>
-                                    </View>
-                                )}
+                                    {editableEvent.requerimientos.llevar && (
+                                        <View style={styles.requirementItem}>
+                                            <View style={styles.requirementIconContainer}>
+                                                <Ionicons name="bag" size={18} color="#fff" />
+                                            </View>
+                                            <View>
+                                                <Text style={styles.requirementLabel}>Llevar</Text>
+                                                <Text style={styles.requirementText}>
+                                                    {editableEvent.requerimientos.llevar}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
                         )}
                     </View>
-                </ScrollView>
+
+                    {/* Botones de acción */}
+                    <View style={styles.viewActionButtonsContainer}>
+                        <ActionButton
+                            icon="create"
+                            title="Editar Evento"
+                            onPress={handleStartEditing}
+                            color="#6a0dad"
+                        />
+
+                        <ActionButton
+                            icon="stats-chart"
+                            title="Dashboard"
+                            onPress={() => router.push(`/event/${event._id.toString()}/dashboard`)}
+                            color="#6a0dad"
+                        />
+
+                        <ActionButton
+                            icon="people"
+                            title="Gestionar Invitados"
+                            onPress={() => router.push(`/event/${event._id.toString()}/guests`)}
+                            color="#8e44ad"
+                        />
+
+                        {editableEvent.requiresPayment && (
+                            <ActionButton
+                                color="#ff4646"
+                                icon="cash"
+                                title="Generar Enlace de Pago"
+                                onPress={async () => {
+                                    try {
+                                        let paymentLink = '';
+                                        if (token) {
+                                            paymentLink = await paymentService.generatePaymentLink(token, event._id.toString());
+                                        } else {
+                                            throw new Error('Token is null');
+                                        }
+                                        Alert.alert(
+                                            'Enlace de Pago',
+                                            'Enlace generado correctamente. Puedes compartirlo con tus invitados.',
+                                            [
+                                                {
+                                                    text: 'Copiar Enlace',
+                                                    onPress: async () => {
+                                                        await Clipboard.setStringAsync(paymentLink);
+                                                        Alert.alert('Éxito', 'Enlace copiado al portapapeles');
+                                                    },
+                                                },
+                                                { text: 'Cerrar' }
+                                            ]
+                                        );
+                                    } catch (error) {
+                                        Alert.alert('Error', 'No se pudo generar el enlace de pago');
+                                    }
+                                }}
+                            />
+                        )}
+                    </View>
+                </Animated.ScrollView>
             );
         }
-    };
+    }
 
     return (
         <>
@@ -768,7 +923,7 @@ export default function EventDetailScreen() {
                 options={{
                     headerTitle: isEditing ? 'Editar Evento' : editableEvent.nombre,
                     headerShown: true,
-                    headerTintColor: 'rgb(51, 18, 59)',
+                    headerTintColor: '#6a0dad',
                 }}
             />
 
@@ -779,7 +934,6 @@ export default function EventDetailScreen() {
     );
 }
 
-// Estilos completos para la pantalla de detalle editable
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -792,429 +946,246 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f9fa',
     },
     loadingText: {
-        marginTop: 10,
+        marginTop: 12,
         fontSize: 16,
-        color: 'rgb(71, 25, 82)',
+        color: '#6a0dad',
+        fontWeight: '500',
     },
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ffebee',
+        margin: 15,
+        marginTop: 20,
+        padding: 12,
+        borderRadius: 12,
+    },
+    errorText: {
+        color: '#ff4646',
+        marginLeft: 10,
+        fontSize: 14,
+        flex: 1,
+    },
+
+    // Vista del evento (no edición)
     headerSection: {
-        padding: 15,
+        marginBottom: 20,
+    },
+    imageContainer: {
         position: 'relative',
+        marginBottom: 0,
     },
     eventImage: {
         width: '100%',
-        height: 180,
-        borderRadius: 10,
-        marginBottom: 15,
+        height: 220,
     },
-    imagePlaceholder: {
+    eventImagePlaceholder: {
         width: '100%',
-        height: 180,
-        borderRadius: 10,
-        backgroundColor: '#e0e0e0',
+        height: 220,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 15,
     },
-    title: {
-        fontSize: 24,
+    eventDetailsCard: {
+        backgroundColor: '#fff',
+        marginHorizontal: 15,
+        marginTop: -30,
+        borderRadius: 20,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    eventTitle: {
+        fontSize: 22,
         fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
+        color: '#333',
         marginBottom: 10,
+    },
+    description: {
+        fontSize: 15,
+        color: '#666',
+        lineHeight: 20,
     },
     statusBadge: {
         position: 'absolute',
-        top: 25,
-        right: 25,
-        backgroundColor: 'rgb(51, 18, 59)',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 15,
+        top: 15,
+        right: 15,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
     },
     statusText: {
         color: '#ffffff',
         fontSize: 12,
         fontWeight: 'bold',
     },
-    description: {
-        fontSize: 16,
-        color: '#666',
-        marginBottom: 10,
-    },
     infoCard: {
         backgroundColor: '#ffffff',
         margin: 15,
-        padding: 15,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: 'rgb(71, 25, 82)',
+        marginTop: 5,
+        padding: 20,
+        borderRadius: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
+        shadowRadius: 4,
+        elevation: 4,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
-        marginBottom: 15,
+        color: '#333',
+        marginBottom: 20,
+    },
+    detailsContainer: {
+        gap: 15,
     },
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10,
+    },
+    infoIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#6a0dad',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15,
+    },
+    infoTextContainer: {
+        flex: 1,
+    },
+    infoLabel: {
+        fontSize: 13,
+        color: '#777',
+        marginBottom: 3,
     },
     infoText: {
         fontSize: 15,
         color: '#333',
-        marginLeft: 10,
-        flex: 1,
+        fontWeight: '500',
     },
     requirementsSection: {
-        marginTop: 10,
-        paddingTop: 10,
+        marginTop: 20,
+        paddingTop: 20,
         borderTopWidth: 1,
-        borderTopColor: '#eee',
+        borderTopColor: '#f0f0f0',
     },
     requirementsTitle: {
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: 'bold',
-        color: '#666',
-        marginBottom: 8,
+        color: '#333',
+        marginBottom: 15,
     },
-    requirementRow: {
+    requirementsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -5,
+    },
+    requirementItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 5,
+        width: '50%',
+        paddingHorizontal: 5,
+        marginBottom: 15,
+    },
+    requirementIconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#8e44ad',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    requirementLabel: {
+        fontSize: 12,
+        color: '#777',
+        marginBottom: 2,
     },
     requirementText: {
         fontSize: 14,
-        color: '#666',
-        marginLeft: 8,
-    },
-    whatsappSection: {
-        margin: 15,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    addButton: {
-        backgroundColor: 'rgb(51, 18, 59)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-    },
-    addButtonText: {
-        color: '#ffffff',
-        fontSize: 13,
-        fontWeight: 'bold',
-    },
-    whatsappCard: {
-        backgroundColor: '#ffffff',
-        padding: 15,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#25D366',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    whatsappInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    whatsappText: {
-        fontSize: 15,
         color: '#333',
-        marginLeft: 10,
     },
-    whatsappButton: {
-        backgroundColor: '#25D366',
+    viewActionButtonsContainer: {
         paddingHorizontal: 15,
-        paddingVertical: 8,
+        paddingBottom: 30,
+        gap: 12,
+    },
+    // Modo edición
+    editEventButton: {
+        position: 'absolute',
+        top: 15,
+        right: 70,
         borderRadius: 20,
-    },
-    whatsappButtonText: {
-        color: '#ffffff',
-        fontSize: 13,
-        fontWeight: 'bold',
-    },
-    sectionContainer: {
-        margin: 15,
-    },
-    pollCard: {
-        backgroundColor: '#ffffff',
-        padding: 15,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: 'rgb(71, 25, 82)',
-        marginBottom: 10,
-    },
-    pollQuestion: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
-        marginBottom: 10,
-    },
-    pollOption: {
-        marginBottom: 8,
-    },
-    pollOptionText: {
-        fontSize: 14,
-        color: '#333',
-        marginBottom: 4,
-    },
-    pollBar: {
-        height: 15,
-        backgroundColor: '#eee',
-        borderRadius: 7.5,
         overflow: 'hidden',
-    },
-    pollBarFill: {
-        height: '100%',
-        backgroundColor: 'rgb(71, 25, 82)',
-        borderRadius: 7.5,
-    },
-    pollCount: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 2,
-        textAlign: 'right',
-    },
-    emptyText: {
-        fontSize: 15,
-        color: '#999',
-        textAlign: 'center',
-        marginVertical: 15,
-    },
-    guestsSection: {
-        margin: 15,
-    },
-    guestCard: {
-        backgroundColor: '#ffffff',
-        padding: 15,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: 'rgb(71, 25, 82)',
-        marginBottom: 10,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    guestInfo: {
-        flex: 1,
-    },
-    guestPhone: {
-        fontSize: 15,
-        color: '#333',
-        marginBottom: 5,
-    },
-    guestStatusBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 10,
-        alignSelf: 'flex-start',
-    },
-    pendingStatus: {
-        backgroundColor: '#ffc107',
-    },
-    confirmedStatus: {
-        backgroundColor: '#28a745',
-    },
-    declinedStatus: {
-        backgroundColor: '#dc3545',
-    },
-    guestStatusText: {
-        fontSize: 10,
-        color: '#ffffff',
-        fontWeight: 'bold',
-    },
-    guestActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    paidBadge: {
-        backgroundColor: '#28a745',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    paidText: {
-        fontSize: 10,
-        color: '#ffffff',
-        fontWeight: 'bold',
-        marginLeft: 3,
-    },
-    guestActionButtons: {
-        flexDirection: 'row',
-    },
-    actionButton: {
-        padding: 8,
-        marginLeft: 5,
-    },
-    errorText: {
-        color: '#ff4646',
-        marginBottom: 15,
-        textAlign: 'center',
-    },
-    modalContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    modalContent: {
-        backgroundColor: '#ffffff',
-        borderRadius: 10,
-        padding: 20,
-        width: '85%',
-        maxWidth: 400,
         elevation: 5,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
     },
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
-        marginBottom: 20,
-        textAlign: 'center',
-    },
-    modalSubtitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#666',
-        marginTop: 10,
-        marginBottom: 8,
-    },
-    paymentModalSubtitle: {
-        fontSize: 15,
-        color: '#333',
-        marginBottom: 8,
-    },
-    input: {
-        width: '100%',
-        height: 45,
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        marginBottom: 15,
-        borderWidth: 1,
-        borderColor: 'rgb(71, 25, 82)',
-    },
-    optionContainer: {
+    editButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 10,
-    },
-    optionInput: {
-        flex: 1,
-        height: 40,
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
         paddingHorizontal: 12,
-        borderWidth: 1,
-        borderColor: 'rgb(71, 25, 82)',
+        paddingVertical: 8,
     },
-    removeButton: {
-        padding: 5,
-        marginLeft: 8,
-    },
-    addOptionButton: {
-        padding: 10,
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    addOptionText: {
-        color: 'rgb(71, 25, 82)',
+    editEventText: {
+        color: '#ffffff',
         fontSize: 14,
         fontWeight: 'bold',
+        marginLeft: 6,
     },
-    modalButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    modalButton: {
-        flex: 1,
-        height: 40,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginHorizontal: 5,
-    },
-    cancelButton: {
-        backgroundColor: '#f8f9fa',
-        borderWidth: 1,
-        borderColor: 'rgb(71, 25, 82)',
-    },
-    inviteButton: {
-        backgroundColor: 'rgb(51, 18, 59)',
-    },
-    createButton: {
-        backgroundColor: 'rgb(51, 18, 59)',
-    },
-    cancelButtonText: {
-        color: 'rgb(71, 25, 82)',
-        fontSize: 15,
-        fontWeight: 'bold',
-    },
-    inviteButtonText: {
-        color: '#ffffff',
-        fontSize: 15,
-        fontWeight: 'bold',
-    },
-    createButtonText: {
-        color: '#ffffff',
-        fontSize: 15,
-        fontWeight: 'bold',
-    },
-
-    // Estilos adicionales para el modo de edición
     editSection: {
         backgroundColor: '#ffffff',
-        padding: 15,
+        padding: 20,
         marginHorizontal: 15,
         marginBottom: 15,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
+        borderRadius: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
+        shadowRadius: 4,
+        elevation: 3,
     },
     editSectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
-        marginBottom: 15,
+        color: '#333',
+        marginBottom: 20,
     },
     inputLabel: {
         fontSize: 14,
         color: '#666',
-        marginBottom: 5,
+        marginBottom: 8,
+        fontWeight: '500',
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f9f9f9',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 12,
+        marginBottom: 15,
+    },
+    inputIcon: {
+        marginHorizontal: 12,
     },
     textInput: {
-        backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#d0d0d0',
-        borderRadius: 8,
-        height: 45,
-        paddingHorizontal: 12,
-        marginBottom: 15,
+        flex: 1,
+        height: 50,
+        paddingHorizontal: 8,
+        paddingVertical: 12,
         fontSize: 16,
         color: '#333',
     },
     textArea: {
-        height: 100,
+        height: 120,
         paddingTop: 12,
         textAlignVertical: 'top',
     },
@@ -1222,143 +1193,179 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 15,
+        marginBottom: 20,
+    },
+    switchLabelContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     switchLabel: {
         fontSize: 16,
         color: '#333',
-    },
-    datePickerButton: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#d0d0d0',
-        borderRadius: 8,
-        height: 45,
-        paddingHorizontal: 12,
-        marginBottom: 15,
-    },
-    datePickerText: {
-        fontSize: 16,
-        color: '#333',
-    },
-    iOSDatePicker: {
-        marginBottom: 15,
+        marginLeft: 10,
     },
     editActions: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginHorizontal: 15,
-        marginBottom: 15,
+        marginBottom: 20,
     },
     editActionButton: {
         flex: 1,
         height: 50,
-        borderRadius: 10,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         marginHorizontal: 5,
     },
     cancelEditButton: {
-        backgroundColor: '#f0f0f0',
+        backgroundColor: '#f5f5f5',
         borderWidth: 1,
-        borderColor: '#d0d0d0',
+        borderColor: '#e0e0e0',
     },
     saveEditButton: {
-        backgroundColor: 'rgb(51, 18, 59)',
+        backgroundColor: '#6a0dad',
     },
     cancelEditButtonText: {
         fontSize: 16,
         color: '#666',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     saveEditButtonText: {
         fontSize: 16,
         color: '#ffffff',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     deleteEventButton: {
+        marginHorizontal: 15,
+        marginBottom: 30,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    deleteGradient: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#ff4646',
-        paddingVertical: 12,
-        marginHorizontal: 15,
-        marginBottom: 30,
-        borderRadius: 10,
+        paddingVertical: 14,
     },
     deleteEventText: {
         fontSize: 16,
         color: '#ffffff',
-        fontWeight: '500',
-        marginLeft: 8,
+        fontWeight: '600',
+        marginLeft: 10,
     },
+    actionButtonsContainer: {
+        paddingHorizontal: 15,
+        paddingBottom: 30,
+        gap: 12,
+    },
+
+    // Editor de imagen
     imageEditContainer: {
         position: 'relative',
         margin: 15,
+        borderRadius: 20,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    imagePlaceholder: {
+        width: '100%',
+        height: 200,
+        overflow: 'hidden',
+    },
+    gradientPlaceholder: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    imagePlaceholderText: {
+        color: 'rgba(255,255,255,0.9)',
+        marginTop: 10,
+        fontWeight: '500',
     },
     imageEditOverlay: {
         position: 'absolute',
-        right: 10,
-        bottom: 10,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        right: 15,
+        bottom: 15,
+    },
+    editIconGradient: {
         width: 40,
         height: 40,
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    imagePlaceholderText: {
-        color: '#aaa',
-        marginTop: 10,
+
+    // Modal
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    blurView: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    modalContent: {
+        backgroundColor: '#ffffff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 24,
+        paddingBottom: 34,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 24,
+        textAlign: 'center',
     },
     imagePickerOption: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
+        paddingVertical: 16,
+    },
+    iconCircle: {
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        backgroundColor: '#f0f0f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15,
+    },
+    deleteIconCircle: {
+        backgroundColor: '#ff4646',
     },
     imagePickerOptionText: {
         fontSize: 16,
         color: '#333',
-        marginLeft: 15,
     },
     removeImageOption: {
-        borderBottomWidth: 0,
+        marginTop: 8,
     },
     removeImageText: {
         fontSize: 16,
         color: '#ff4646',
-        marginLeft: 15,
     },
-    editEventButton: {
-        position: 'absolute',
-        top: 15,
-        right: 15,
-        backgroundColor: 'rgb(51, 18, 59)',
-        flexDirection: 'row',
+    modalCloseButton: {
+        marginTop: 24,
+        paddingVertical: 16,
         alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
     },
-    editEventText: {
-        color: '#ffffff',
-        fontSize: 13,
-        fontWeight: 'bold',
-        marginLeft: 4,
-    },
-    actionButtonsContainer: {
-        marginTop: 20,
-        marginBottom: 10,
-        gap: 10,
-    },
-    actionButtonText: {
-        color: '#ffffff',
+    modalCloseText: {
         fontSize: 16,
-        fontWeight: '500',
-    },
+        color: '#6a0dad',
+        fontWeight: '600',
+    }
 });

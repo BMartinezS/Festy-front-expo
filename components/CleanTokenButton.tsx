@@ -24,13 +24,15 @@ export function CleanTokenButton() {
         </View>
     )
 }
-
+// mobile first
 const styles = StyleSheet.create({
     button: {
         backgroundColor: '#fe3f2e',
         borderRadius: 10,
-        width: '100%',
-        height: '100%',
+        padding: 10,
+        margin: 10,
+        width: 100,
+        height: 100,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',

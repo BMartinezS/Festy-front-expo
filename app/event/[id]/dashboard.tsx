@@ -4,12 +4,13 @@ import {
     StyleSheet,
     View,
     Text,
-    ScrollView,
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
     Dimensions,
     Alert,
+    StatusBar,
+    Animated,
 } from 'react-native';
 import { useLocalSearchParams, Stack, useFocusEffect, router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,30 +18,39 @@ import { Ionicons } from '@expo/vector-icons';
 import { Event, eventService } from '@/services/event.service';
 import { paymentService } from '@/services/payment.service';
 import { LineChart, PieChart } from 'react-native-chart-kit';
+import { LinearGradient } from 'expo-linear-gradient';
+import ActionButton from '@/components/ui/ActionButton';
 
 // Componente para una tarjeta de estadísticas
-const StatCard = ({ title, value, icon, color, subtitle, onPress }: any) => (
-    <TouchableOpacity
-        style={[styles.card, { borderLeftColor: color, borderLeftWidth: 5 }]}
-        onPress={onPress}
-        disabled={!onPress}
-    >
-        <View style={styles.cardContent}>
-            <View style={styles.cardIconContainer}>
-                <Ionicons name={icon} size={24} color={color} />
+const StatCard = ({ title, value, icon, color, subtitle, onPress }: any) => {
+
+    return (
+        <TouchableOpacity
+            style={styles.card}
+            onPress={onPress}
+            disabled={!onPress}
+            activeOpacity={0.8}
+        >
+            <View style={styles.cardContent}>
+                <View style={[styles.cardIconContainer, { backgroundColor: `${color}20` }]}>
+                    <Ionicons name={icon} size={24} color={color} />
+                </View>
+                <View style={styles.cardTextContainer}>
+                    <Text style={styles.cardTitle}>{title}</Text>
+                    <Text style={[styles.cardValue, { color }]}>{value}</Text>
+                    {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
+                </View>
             </View>
-            <View style={styles.cardTextContainer}>
-                <Text style={styles.cardTitle}>{title}</Text>
-                <Text style={[styles.cardValue, { color }]}>{value}</Text>
-                {subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
-            </View>
-        </View>
-    </TouchableOpacity>
-);
+            <View style={[styles.cardIndicator, { backgroundColor: color }]} />
+        </TouchableOpacity>
+    );
+};
 
 export default function EventDashboardScreen() {
     const { id: eventId } = useLocalSearchParams();
     const [event, setEvent] = useState<Event | null>(null);
+    const [fadeAnim] = useState(new Animated.Value(0));
+
     interface PaymentStatus {
         totalPaid: number;
         totalPending: number;
@@ -49,7 +59,7 @@ export default function EventDashboardScreen() {
             pending: number;
         };
     }
-    
+
     const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
     const [attendanceStats, setAttendanceStats] = useState({
         confirmed: 0,
@@ -64,6 +74,15 @@ export default function EventDashboardScreen() {
     const [token, setToken] = useState<string | null>(null);
 
     const screenWidth = Dimensions.get('window').width - 40;
+
+    // Animación de entrada
+    useEffect(() => {
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+        }).start();
+    }, []);
 
     // Obtener datos del evento y estadísticas
     const loadDashboardData = useCallback(async () => {
@@ -174,7 +193,7 @@ export default function EventDashboardScreen() {
             datasets: [
                 {
                     data: [],
-                    color: (opacity = 1) => `rgba(71, 25, 82, ${opacity})`,
+                    color: (opacity = 1) => `rgba(106, 13, 173, ${opacity})`,
                     strokeWidth: 2,
                 },
             ],
@@ -208,17 +227,29 @@ export default function EventDashboardScreen() {
             datasets: [
                 {
                     data,
-                    color: (opacity = 1) => `rgba(71, 25, 82, ${opacity})`,
+                    color: (opacity = 1) => `rgba(106, 13, 173, ${opacity})`,
                     strokeWidth: 2,
                 },
             ],
         };
     };
 
+    // Función para obtener color de estado
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'active': return '#28a745';
+            case 'completed': return '#6c757d';
+            case 'cancelled': return '#dc3545';
+            case 'draft': return '#ffc107';
+            default: return '#6a0dad';
+        }
+    };
+
     if (loading && !refreshing) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="rgb(51, 18, 59)" />
+                <StatusBar barStyle="light-content" backgroundColor="#6a0dad" />
+                <ActivityIndicator size="large" color="#6a0dad" />
                 <Text style={styles.loadingText}>Cargando dashboard...</Text>
             </View>
         );
@@ -228,42 +259,73 @@ export default function EventDashboardScreen() {
         <>
             <Stack.Screen
                 options={{
-                    headerTitle: 'Dashboard del Evento',
+                    headerTitle: 'Dashboard',
                     headerShown: true,
-                    headerTintColor: 'rgb(51, 18, 59)',
+                    headerTitleStyle: { fontWeight: 'bold' },
+                    headerTintColor: '#fff',
+                    headerStyle: {
+                        backgroundColor: '#6a0dad',
+                    }
                 }}
             />
 
-            <ScrollView
-                style={styles.container}
+            <Animated.ScrollView
+                style={[styles.container, { opacity: fadeAnim }]}
                 contentContainerStyle={styles.contentContainer}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        colors={['#6a0dad']}
+                        tintColor="#6a0dad"
+                    />
                 }
             >
-                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                <StatusBar barStyle="light-content" backgroundColor="#6a0dad" />
+
+                {error ? (
+                    <View style={styles.errorContainer}>
+                        <Ionicons name="alert-circle" size={24} color="#ff4646" />
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                ) : null}
 
                 {/* Información general del evento */}
                 {event && (
                     <View style={styles.eventInfoCard}>
-                        <Text style={styles.eventName}>{event.nombre}</Text>
+                        <LinearGradient
+                            colors={['#6a0dad', '#8e44ad']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.eventHeaderGradient}
+                        >
+                            <Text style={styles.eventName}>{event.nombre}</Text>
+                            <View style={[
+                                styles.statusBadge,
+                                { backgroundColor: getStatusColor(event.status) }
+                            ]}>
+                                <Text style={styles.statusBadgeText}>{event.status.toUpperCase()}</Text>
+                            </View>
+                        </LinearGradient>
 
-                        <View style={styles.eventDetail}>
-                            <Ionicons name="calendar-outline" size={18} color="rgb(71, 25, 82)" />
-                            <Text style={styles.eventDetailText}>
-                                {new Date(event.fechaInicio).toLocaleDateString()}
-                            </Text>
-                        </View>
+                        <View style={styles.eventDetailsContainer}>
+                            <View style={styles.eventDetail}>
+                                <View style={styles.eventDetailIconContainer}>
+                                    <Ionicons name="calendar" size={18} color="#6a0dad" />
+                                </View>
+                                <Text style={styles.eventDetailText}>
+                                    {new Date(event.fechaInicio).toLocaleDateString()}
+                                </Text>
+                            </View>
 
-                        <View style={styles.eventDetail}>
-                            <Ionicons name="location-outline" size={18} color="rgb(71, 25, 82)" />
-                            <Text style={styles.eventDetailText}>
-                                {event.ubicacion.address}
-                            </Text>
-                        </View>
-
-                        <View style={styles.statusBadge}>
-                            <Text style={styles.statusBadgeText}>{event.status.toUpperCase()}</Text>
+                            <View style={styles.eventDetail}>
+                                <View style={styles.eventDetailIconContainer}>
+                                    <Ionicons name="location" size={18} color="#6a0dad" />
+                                </View>
+                                <Text style={styles.eventDetailText}>
+                                    {event.ubicacion.address}
+                                </Text>
+                            </View>
                         </View>
                     </View>
                 )}
@@ -278,15 +340,15 @@ export default function EventDashboardScreen() {
                         <StatCard
                             title="Total Invitados"
                             value={attendanceStats.total.toString()}
-                            icon="people-outline"
-                            color="#6c757d"
+                            icon="people"
+                            color="#6a0dad"
                             onPress={navigateToGuests}
                         />
 
                         <StatCard
                             title="Confirmados"
                             value={attendanceStats.confirmed.toString()}
-                            icon="checkmark-circle-outline"
+                            icon="checkmark-circle"
                             color="#28a745"
                             subtitle={`${Math.round((attendanceStats.confirmed / (attendanceStats.total || 1)) * 100)}%`}
                             onPress={navigateToGuests}
@@ -295,7 +357,7 @@ export default function EventDashboardScreen() {
                         <StatCard
                             title="Pendientes"
                             value={attendanceStats.pending.toString()}
-                            icon="time-outline"
+                            icon="time"
                             color="#ffc107"
                             subtitle={`${Math.round((attendanceStats.pending / (attendanceStats.total || 1)) * 100)}%`}
                             onPress={navigateToGuests}
@@ -304,7 +366,7 @@ export default function EventDashboardScreen() {
                         <StatCard
                             title="Rechazados"
                             value={attendanceStats.declined.toString()}
-                            icon="close-circle-outline"
+                            icon="close-circle"
                             color="#dc3545"
                             subtitle={`${Math.round((attendanceStats.declined / (attendanceStats.total || 1)) * 100)}%`}
                             onPress={navigateToGuests}
@@ -345,21 +407,21 @@ export default function EventDashboardScreen() {
                             <StatCard
                                 title="Total Recaudado"
                                 value={`$${paymentStatus.totalPaid.toLocaleString()}`}
-                                icon="cash-outline"
+                                icon="cash"
                                 color="#28a745"
                             />
 
                             <StatCard
                                 title="Pendiente por Cobrar"
                                 value={`$${paymentStatus.totalPending.toLocaleString()}`}
-                                icon="alert-circle-outline"
+                                icon="alert-circle"
                                 color="#ffc107"
                             />
 
                             <StatCard
                                 title="Invitados Pagados"
                                 value={paymentStatus.guests.paid.toString()}
-                                icon="checkmark-done-outline"
+                                icon="checkmark-done"
                                 color="#28a745"
                                 subtitle={`${Math.round((paymentStatus.guests.paid / (attendanceStats.total || 1)) * 100)}%`}
                                 onPress={navigateToGuests}
@@ -368,7 +430,7 @@ export default function EventDashboardScreen() {
                             <StatCard
                                 title="Invitados sin Pagar"
                                 value={paymentStatus.guests.pending.toString()}
-                                icon="wallet-outline"
+                                icon="wallet"
                                 color="#dc3545"
                                 subtitle={`${Math.round((paymentStatus.guests.pending / (attendanceStats.total || 1)) * 100)}%`}
                                 onPress={navigateToGuests}
@@ -388,13 +450,13 @@ export default function EventDashboardScreen() {
                                         backgroundGradientFrom: '#ffffff',
                                         backgroundGradientTo: '#ffffff',
                                         decimalPlaces: 0,
-                                        color: (opacity = 1) => `rgba(71, 25, 82, ${opacity})`,
+                                        color: (opacity = 1) => `rgba(106, 13, 173, ${opacity})`,
                                         labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
                                         style: { borderRadius: 16 },
                                         propsForDots: {
                                             r: '6',
                                             strokeWidth: '2',
-                                            stroke: 'rgb(51, 18, 59)',
+                                            stroke: '#6a0dad',
                                         },
                                     }}
                                     bezier
@@ -410,29 +472,24 @@ export default function EventDashboardScreen() {
                     <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
 
                     <View style={styles.actionButtonsContainer}>
-                        <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={navigateToGuests}
-                        >
-                            <View style={[styles.actionButtonIcon, { backgroundColor: 'rgba(71, 25, 82, 0.1)' }]}>
-                                <Ionicons name="people" size={24} color="rgb(71, 25, 82)" />
-                            </View>
-                            <Text style={styles.actionButtonText}>Gestionar Invitados</Text>
-                        </TouchableOpacity>
+                        <ActionButton
+                            icon="people"
+                            title="Gestionar invitados"
+                            onPress={() => navigateToGuests()}
+                            color="#17a2b8"
+                        />
 
-                        <TouchableOpacity
-                            style={styles.actionButton}
+                        <ActionButton
+                            icon="create"
+                            title="Detalles del evento"
                             onPress={() => router.push(`/event/${eventId}`)}
-                        >
-                            <View style={[styles.actionButtonIcon, { backgroundColor: 'rgba(23, 162, 184, 0.1)' }]}>
-                                <Ionicons name="create" size={24} color="#17a2b8" />
-                            </View>
-                            <Text style={styles.actionButtonText}>Editar Evento</Text>
-                        </TouchableOpacity>
+                            color="#17a2b8"
+                        />
 
                         {event && event.requiresPayment && (
-                            <TouchableOpacity
-                                style={styles.actionButton}
+                            <ActionButton
+                                icon="notifications"
+                                title="Recordar Pagos"
                                 onPress={() => {
                                     // Implementar lógica para enviar recordatorios de pago
                                     Alert.alert(
@@ -450,16 +507,12 @@ export default function EventDashboardScreen() {
                                         ]
                                     );
                                 }}
-                            >
-                                <View style={[styles.actionButtonIcon, { backgroundColor: 'rgba(255, 193, 7, 0.1)' }]}>
-                                    <Ionicons name="notifications" size={24} color="#ffc107" />
-                                </View>
-                                <Text style={styles.actionButtonText}>Recordar Pagos</Text>
-                            </TouchableOpacity>
+                                color="#17a2b8"
+                            />
                         )}
                     </View>
                 </View>
-            </ScrollView>
+            </Animated.ScrollView>
         </>
     );
 }
@@ -477,56 +530,80 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#f8f9fa',
     },
     loadingText: {
-        marginTop: 10,
+        marginTop: 12,
         fontSize: 16,
-        color: 'rgb(71, 25, 82)',
+        color: '#6a0dad',
+        fontWeight: '500',
+    },
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ffebee',
+        padding: 12,
+        borderRadius: 10,
+        marginBottom: 15,
     },
     errorText: {
         color: '#ff4646',
-        textAlign: 'center',
-        marginVertical: 10,
+        marginLeft: 10,
+        fontSize: 14,
+        flex: 1,
     },
     eventInfoCard: {
         backgroundColor: '#ffffff',
-        borderRadius: 10,
-        padding: 15,
+        borderRadius: 16,
         marginBottom: 20,
-        borderWidth: 1,
-        borderColor: '#eee',
+        overflow: 'hidden',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
+        shadowRadius: 5,
+        elevation: 3,
+    },
+    eventHeaderGradient: {
+        padding: 15,
+        paddingTop: 20,
+        paddingBottom: 20,
         position: 'relative',
     },
     eventName: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
-        marginBottom: 10,
+        color: '#ffffff',
+        marginBottom: 5,
         paddingRight: 80, // Espacio para el badge
+    },
+    eventDetailsContainer: {
+        padding: 15,
     },
     eventDetail: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 5,
+        marginBottom: 8,
+    },
+    eventDetailIconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(106, 13, 173, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
     },
     eventDetailText: {
-        marginLeft: 10,
         fontSize: 14,
-        color: '#666',
+        color: '#555',
     },
     statusBadge: {
         position: 'absolute',
         top: 15,
         right: 15,
-        backgroundColor: 'rgb(51, 18, 59)',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 15,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
     },
     statusBadgeText: {
         color: '#ffffff',
@@ -535,22 +612,20 @@ const styles = StyleSheet.create({
     },
     sectionContainer: {
         backgroundColor: '#ffffff',
-        borderRadius: 10,
-        padding: 15,
+        borderRadius: 16,
+        padding: 20,
         marginBottom: 20,
-        borderWidth: 1,
-        borderColor: '#eee',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
+        shadowRadius: 4,
+        elevation: 3,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
-        marginBottom: 15,
+        color: '#333',
+        marginBottom: 20,
     },
     cardsGrid: {
         flexDirection: 'row',
@@ -560,16 +635,16 @@ const styles = StyleSheet.create({
     card: {
         width: '48%',
         backgroundColor: '#ffffff',
-        borderRadius: 8,
-        padding: 12,
+        borderRadius: 12,
+        padding: 15,
         marginBottom: 15,
-        borderWidth: 1,
-        borderColor: '#eee',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 1,
+        shadowRadius: 3,
+        elevation: 2,
+        position: 'relative',
+        overflow: 'hidden',
     },
     cardContent: {
         flexDirection: 'row',
@@ -581,7 +656,6 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
         marginRight: 10,
     },
     cardTextContainer: {
@@ -590,61 +664,41 @@ const styles = StyleSheet.create({
     cardTitle: {
         fontSize: 12,
         color: '#666',
+        marginBottom: 2,
     },
     cardValue: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: 'bold',
-        marginTop: 2,
     },
     cardSubtitle: {
         fontSize: 12,
-        color: '#999',
+        color: '#888',
         marginTop: 2,
     },
+    cardIndicator: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 4,
+        borderTopLeftRadius: 12,
+        borderBottomLeftRadius: 12,
+    },
     chartContainer: {
-        marginTop: 10,
+        marginTop: 15,
         paddingTop: 15,
         borderTopWidth: 1,
-        borderTopColor: '#eee',
+        borderTopColor: '#f0f0f0',
     },
     chartTitle: {
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
         color: '#333',
-        marginBottom: 10,
+        marginBottom: 15,
         textAlign: 'center',
     },
     actionButtonsContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-    },
-    actionButton: {
-        width: '48%',
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        padding: 15,
-        marginBottom: 15,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#eee',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 1,
-    },
-    actionButtonIcon: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    actionButtonText: {
-        fontSize: 14,
-        color: '#333',
-        textAlign: 'center',
+        flexDirection: 'column',
+        gap: 12,
     },
 });

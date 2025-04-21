@@ -11,12 +11,16 @@ import {
     Alert,
     ActivityIndicator,
     Platform,
+    SafeAreaView,
+    StatusBar,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '@/services/auth.service';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface UserProfile {
     id: string;
@@ -73,6 +77,7 @@ export default function ProfileScreen() {
                 name: profile.name,
                 email: profile.email,
                 phone: profile.phone,
+                avatar: profile.avatar,
             });
             setIsEditing(true);
         }
@@ -86,8 +91,8 @@ export default function ProfileScreen() {
 
     // Función para guardar los cambios del perfil
     const handleSave = async () => {
-        if (!updatedProfile.name || !updatedProfile.email || !updatedProfile.phone) {
-            setError('Todos los campos son obligatorios');
+        if (!updatedProfile.name || !updatedProfile.email) {
+            setError('Nombre y correo son obligatorios');
             return;
         }
 
@@ -105,7 +110,7 @@ export default function ProfileScreen() {
             await loadProfile(); // Recargar el perfil con los datos actualizados
             setIsEditing(false);
 
-            Alert.alert('Éxito', 'Perfil actualizado correctamente');
+            Alert.alert('Perfil actualizado', 'Tus datos han sido actualizados correctamente');
         } catch (error: any) {
             setError(error.message || 'Error al actualizar perfil');
             console.error('Error al actualizar perfil:', error);
@@ -116,7 +121,6 @@ export default function ProfileScreen() {
 
     // Función para seleccionar una imagen de perfil
     const pickImage = async () => {
-        // Solicitar permisos de galería
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
         if (status !== 'granted') {
@@ -129,18 +133,14 @@ export default function ProfileScreen() {
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,
                 aspect: [1, 1],
-                quality: 0.5,
+                quality: 0.7,
             });
 
-            if (!result.canceled) {
-                // Actualizar la vista previa de la imagen
+            if (!result.canceled && result.assets && result.assets.length > 0) {
                 setUpdatedProfile({
                     ...updatedProfile,
                     avatar: result.assets[0].uri,
                 });
-
-                // Aquí se podría implementar la subida de la imagen a un servidor
-                // utilizando un servicio específico para ello
             }
         } catch (error) {
             console.error('Error al seleccionar imagen:', error);
@@ -152,26 +152,22 @@ export default function ProfileScreen() {
     const handleLogout = async () => {
         Alert.alert(
             'Cerrar Sesión',
-            '¿Estás seguro que deseas cerrar sesión?',
+            '¿Estás seguro que deseas salir de tu cuenta?',
             [
                 { text: 'Cancelar', style: 'cancel' },
                 {
-                    text: 'Sí, salir',
+                    text: 'Cerrar Sesión',
                     style: 'destructive',
                     onPress: async () => {
                         try {
                             const token = await AsyncStorage.getItem('userToken');
                             if (token) {
-                                // Intentar hacer logout en el servidor
                                 try {
                                     await authService.logout(token);
                                 } catch (error) {
                                     console.error('Error en logout:', error);
-                                    // Continuamos con el proceso aunque falle el logout en servidor
                                 }
                             }
-
-                            // Eliminar el token localmente
                             await AsyncStorage.removeItem('userToken');
                             router.replace('/auth/login');
                         } catch (error) {
@@ -187,171 +183,238 @@ export default function ProfileScreen() {
     if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="rgb(51, 18, 59)" />
+                <ActivityIndicator size="large" color="#8e44ad" />
                 <Text style={styles.loadingText}>Cargando perfil...</Text>
             </View>
         );
     }
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-            <View style={styles.header}>
-                <View style={styles.avatarContainer}>
-                    {isEditing ? (
-                        <TouchableOpacity style={styles.avatarEditButton} onPress={pickImage}>
-                            {updatedProfile.avatar ? (
-                                <Image source={{ uri: updatedProfile.avatar }} style={styles.avatar} />
-                            ) : profile?.avatar ? (
-                                <Image source={{ uri: profile.avatar }} style={styles.avatar} />
+        <SafeAreaView style={styles.safeArea}>
+            <StatusBar barStyle="light-content" backgroundColor="#6a0dad" />
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+                <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+                    {/* Header con gradiente */}
+                    <LinearGradient
+                        colors={['#8e44ad', '#6a0dad']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.header}
+                    >
+                        <View style={styles.avatarContainer}>
+                            {isEditing ? (
+                                <TouchableOpacity style={styles.avatarEditButton} onPress={pickImage}>
+                                    {updatedProfile.avatar ? (
+                                        <Image source={{ uri: updatedProfile.avatar }} style={styles.avatar} />
+                                    ) : profile?.avatar ? (
+                                        <Image source={{ uri: profile.avatar }} style={styles.avatar} />
+                                    ) : (
+                                        <View style={styles.avatarPlaceholder}>
+                                            <Ionicons name="person" size={40} color="#ffffff" />
+                                        </View>
+                                    )}
+                                    <View style={styles.editIconContainer}>
+                                        <Ionicons name="camera" size={18} color="#ffffff" />
+                                    </View>
+                                </TouchableOpacity>
                             ) : (
-                                <View style={styles.avatarPlaceholder}>
-                                    <Ionicons name="person" size={40} color="#ffffff" />
-                                </View>
-                            )}
-                            <View style={styles.editIconContainer}>
-                                <Ionicons name="camera" size={18} color="#ffffff" />
-                            </View>
-                        </TouchableOpacity>
-                    ) : (
-                        profile?.avatar ? (
-                            <Image source={{ uri: profile.avatar }} style={styles.avatar} />
-                        ) : (
-                            <View style={styles.avatarPlaceholder}>
-                                <Ionicons name="person" size={40} color="#ffffff" />
-                            </View>
-                        )
-                    )}
-                </View>
-
-                <Text style={styles.headerName}>
-                    {profile?.name || 'Usuario'}
-                </Text>
-
-                {!isEditing && (
-                    <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-                        <Ionicons name="create-outline" size={18} color="#ffffff" />
-                        <Text style={styles.editButtonText}>Editar</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            <View style={styles.infoContainer}>
-                {isEditing ? (
-                    // Modo de edición
-                    <>
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Nombre</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={updatedProfile.name}
-                                onChangeText={(text) => setUpdatedProfile({ ...updatedProfile, name: text })}
-                                placeholder="Nombre completo"
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Correo electrónico</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={updatedProfile.email}
-                                onChangeText={(text) => setUpdatedProfile({ ...updatedProfile, email: text })}
-                                placeholder="Correo electrónico"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Teléfono</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={updatedProfile.phone}
-                                onChangeText={(text) => setUpdatedProfile({ ...updatedProfile, phone: text })}
-                                placeholder="Número de teléfono"
-                                keyboardType="phone-pad"
-                            />
-                        </View>
-
-                        <View style={styles.buttonGroup}>
-                            <TouchableOpacity
-                                style={[styles.button, styles.cancelButton]}
-                                onPress={handleCancel}
-                                disabled={isSaving}
-                            >
-                                <Text style={styles.cancelButtonText}>Cancelar</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.button, styles.saveButton]}
-                                onPress={handleSave}
-                                disabled={isSaving}
-                            >
-                                {isSaving ? (
-                                    <ActivityIndicator size="small" color="#ffffff" />
+                                profile?.avatar ? (
+                                    <Image source={{ uri: profile.avatar }} style={styles.avatar} />
                                 ) : (
-                                    <Text style={styles.saveButtonText}>Guardar</Text>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    </>
-                ) : (
-                    // Modo de visualización
-                    <>
-                        <View style={styles.infoSection}>
-                            <View style={styles.infoItem}>
-                                <Ionicons name="person-outline" size={20} color="rgb(71, 25, 82)" />
-                                <View style={styles.infoTextContainer}>
-                                    <Text style={styles.infoLabel}>Nombre</Text>
-                                    <Text style={styles.infoValue}>{profile?.name}</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.infoItem}>
-                                <Ionicons name="mail-outline" size={20} color="rgb(71, 25, 82)" />
-                                <View style={styles.infoTextContainer}>
-                                    <Text style={styles.infoLabel}>Correo electrónico</Text>
-                                    <Text style={styles.infoValue}>{profile?.email}</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.infoItem}>
-                                <Ionicons name="call-outline" size={20} color="rgb(71, 25, 82)" />
-                                <View style={styles.infoTextContainer}>
-                                    <Text style={styles.infoLabel}>Teléfono</Text>
-                                    <Text style={styles.infoValue}>{profile?.phone}</Text>
-                                </View>
-                            </View>
+                                    <View style={styles.avatarPlaceholder}>
+                                        <Ionicons name="person" size={40} color="#ffffff" />
+                                    </View>
+                                )
+                            )}
                         </View>
 
-                        <View style={styles.actionsSection}>
-                            <TouchableOpacity
-                                style={styles.actionButton}
-                                // onPress={() => router.push('/user/change-password')}
-                            >
-                                <Ionicons name="lock-closed-outline" size={20} color="rgb(71, 25, 82)" />
-                                <Text style={styles.actionText}>Cambiar contraseña</Text>
-                                <Ionicons name="chevron-forward" size={20} color="#999" />
-                            </TouchableOpacity>
+                        <Text style={styles.headerName}>
+                            {profile?.name || 'Usuario'}
+                        </Text>
 
-                            <TouchableOpacity
-                                style={[styles.actionButton, styles.logoutButton]}
-                                onPress={handleLogout}
-                            >
-                                <Ionicons name="log-out-outline" size={20} color="#FF3B30" />
-                                <Text style={styles.logoutText}>Cerrar sesión</Text>
-                                <View style={{ width: 20 }} />
+                        {!isEditing && (
+                            <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+                                <Ionicons name="create-outline" size={18} color="#ffffff" />
+                                <Text style={styles.editButtonText}>Editar Perfil</Text>
                             </TouchableOpacity>
+                        )}
+                    </LinearGradient>
+
+                    {error ? (
+                        <View style={styles.errorContainer}>
+                            <Ionicons name="alert-circle" size={20} color="#FF3B30" />
+                            <Text style={styles.errorText}>{error}</Text>
                         </View>
-                    </>
-                )}
-            </View>
-        </ScrollView>
+                    ) : null}
+
+                    <View style={styles.infoContainer}>
+                        {isEditing ? (
+                            // Modo de edición
+                            <>
+                                <View style={styles.formContainer}>
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>Nombre completo</Text>
+                                        <View style={styles.inputWrapper}>
+                                            <Ionicons name="person-outline" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                            <TextInput
+                                                style={styles.input}
+                                                value={updatedProfile.name}
+                                                onChangeText={(text) => setUpdatedProfile({ ...updatedProfile, name: text })}
+                                                placeholder="Tu nombre completo"
+                                                placeholderTextColor="#aaa"
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>Correo electrónico</Text>
+                                        <View style={styles.inputWrapper}>
+                                            <Ionicons name="mail-outline" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                            <TextInput
+                                                style={styles.input}
+                                                value={updatedProfile.email}
+                                                onChangeText={(text) => setUpdatedProfile({ ...updatedProfile, email: text })}
+                                                placeholder="Tu correo electrónico"
+                                                placeholderTextColor="#aaa"
+                                                keyboardType="email-address"
+                                                autoCapitalize="none"
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>Número de teléfono</Text>
+                                        <View style={styles.inputWrapper}>
+                                            <Ionicons name="call-outline" size={20} color="#8e44ad" style={styles.inputIcon} />
+                                            <TextInput
+                                                style={styles.input}
+                                                value={updatedProfile.phone}
+                                                onChangeText={(text) => setUpdatedProfile({ ...updatedProfile, phone: text })}
+                                                placeholder="Tu número de teléfono"
+                                                placeholderTextColor="#aaa"
+                                                keyboardType="phone-pad"
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.buttonGroup}>
+                                        <TouchableOpacity
+                                            style={[styles.button, styles.cancelButton]}
+                                            onPress={handleCancel}
+                                            disabled={isSaving}
+                                        >
+                                            <Text style={styles.cancelButtonText}>Cancelar</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={[styles.button, styles.saveButton]}
+                                            onPress={handleSave}
+                                            disabled={isSaving}
+                                        >
+                                            {isSaving ? (
+                                                <ActivityIndicator size="small" color="#ffffff" />
+                                            ) : (
+                                                <Text style={styles.saveButtonText}>Guardar</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </>
+                        ) : (
+                            // Modo de visualización
+                            <>
+                                <View style={styles.infoSection}>
+                                    <View style={styles.infoItem}>
+                                        <View style={styles.infoIconContainer}>
+                                            <Ionicons name="person-outline" size={20} color="#ffffff" />
+                                        </View>
+                                        <View style={styles.infoTextContainer}>
+                                            <Text style={styles.infoLabel}>Nombre</Text>
+                                            <Text style={styles.infoValue}>{profile?.name}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.infoItem}>
+                                        <View style={styles.infoIconContainer}>
+                                            <Ionicons name="mail-outline" size={20} color="#ffffff" />
+                                        </View>
+                                        <View style={styles.infoTextContainer}>
+                                            <Text style={styles.infoLabel}>Correo electrónico</Text>
+                                            <Text style={styles.infoValue}>{profile?.email}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.infoItem}>
+                                        <View style={styles.infoIconContainer}>
+                                            <Ionicons name="call-outline" size={20} color="#ffffff" />
+                                        </View>
+                                        <View style={styles.infoTextContainer}>
+                                            <Text style={styles.infoLabel}>Teléfono</Text>
+                                            <Text style={styles.infoValue}>{profile?.phone || 'No especificado'}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                <View style={styles.actionsSection}>
+                                    <TouchableOpacity
+                                        style={styles.actionButton}
+                                    >
+                                        <View style={styles.actionIconContainer}>
+                                            <Ionicons name="lock-closed-outline" size={20} color="#ffffff" />
+                                        </View>
+                                        <Text style={styles.actionText}>Cambiar contraseña</Text>
+                                        <Ionicons name="chevron-forward" size={20} color="#999" />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.actionButton}
+                                    >
+                                        <View style={styles.actionIconContainer}>
+                                            <Ionicons name="notifications-outline" size={20} color="#ffffff" />
+                                        </View>
+                                        <Text style={styles.actionText}>Notificaciones</Text>
+                                        <Ionicons name="chevron-forward" size={20} color="#999" />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.actionButton}
+                                    >
+                                        <View style={styles.actionIconContainer}>
+                                            <Ionicons name="help-circle-outline" size={20} color="#ffffff" />
+                                        </View>
+                                        <Text style={styles.actionText}>Ayuda y soporte</Text>
+                                        <Ionicons name="chevron-forward" size={20} color="#999" />
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.actionButton, styles.logoutButton]}
+                                        onPress={handleLogout}
+                                    >
+                                        <View style={[styles.actionIconContainer, styles.logoutIconContainer]}>
+                                            <Ionicons name="log-out-outline" size={20} color="#ffffff" />
+                                        </View>
+                                        <Text style={styles.logoutText}>Cerrar sesión</Text>
+                                        <View style={{ width: 20 }} />
+                                    </TouchableOpacity>
+                                </View>
+                            </>
+                        )}
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: '#6a0dad',
+    },
     container: {
         flex: 1,
         backgroundColor: '#f8f9fa',
@@ -363,37 +426,37 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#f8f9fa',
     },
     loadingText: {
         marginTop: 10,
         fontSize: 16,
-        color: 'rgb(71, 25, 82)',
+        color: '#8e44ad',
     },
     header: {
-        backgroundColor: 'rgb(51, 18, 59)',
-        padding: 20,
+        padding: 24,
         alignItems: 'center',
-        paddingTop: Platform.OS === 'ios' ? 60 : 40,
+        paddingTop: Platform.OS === 'ios' ? 10 : 40,
         paddingBottom: 30,
     },
     avatarContainer: {
-        marginBottom: 15,
+        marginBottom: 16,
     },
     avatar: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        borderWidth: 3,
+        width: 110,
+        height: 110,
+        borderRadius: 55,
+        borderWidth: 4,
         borderColor: '#ffffff',
     },
     avatarPlaceholder: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 110,
+        height: 110,
+        borderRadius: 55,
         backgroundColor: 'rgba(255,255,255,0.3)',
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 3,
+        borderWidth: 4,
         borderColor: '#ffffff',
     },
     avatarEditButton: {
@@ -403,138 +466,190 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 0,
         right: 0,
-        backgroundColor: 'rgb(71, 25, 82)',
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        backgroundColor: '#8e44ad',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: '#ffffff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
     },
     headerName: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: 'bold',
         color: '#ffffff',
+        marginBottom: 4,
     },
     editButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingHorizontal: 15,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
-        marginTop: 10,
+        marginTop: 8,
     },
     editButtonText: {
         color: '#ffffff',
-        marginLeft: 5,
+        marginLeft: 6,
         fontSize: 14,
+        fontWeight: '600',
+    },
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFEEEE',
+        margin: 16,
+        marginTop: 0,
+        padding: 12,
+        borderRadius: 8,
     },
     errorText: {
         color: '#FF3B30',
-        textAlign: 'center',
-        marginVertical: 10,
-        paddingHorizontal: 20,
+        marginLeft: 8,
+        fontSize: 14,
+        flex: 1,
     },
     infoContainer: {
         flex: 1,
-        padding: 20,
+        padding: 16,
     },
-    infoSection: {
+    formContainer: {
         backgroundColor: '#ffffff',
-        borderRadius: 10,
-        padding: 15,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
+        borderRadius: 16,
+        padding: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
-        shadowRadius: 2,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    infoSection: {
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
         elevation: 2,
     },
     infoItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
     },
+    infoIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#8e44ad',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     infoTextContainer: {
-        marginLeft: 15,
+        marginLeft: 16,
         flex: 1,
     },
     infoLabel: {
-        fontSize: 12,
+        fontSize: 13,
         color: '#999',
+        marginBottom: 2,
     },
     infoValue: {
         fontSize: 16,
         color: '#333',
-        marginTop: 2,
+        fontWeight: '500',
     },
     actionsSection: {
         backgroundColor: '#ffffff',
-        borderRadius: 10,
+        borderRadius: 16,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 2,
+        shadowRadius: 4,
         elevation: 2,
     },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 15,
+        padding: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
+    },
+    actionIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#8e44ad',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
     },
     actionText: {
         fontSize: 16,
         color: '#333',
         flex: 1,
-        marginLeft: 15,
+        fontWeight: '500',
     },
     logoutButton: {
         borderBottomWidth: 0,
+    },
+    logoutIconContainer: {
+        backgroundColor: '#FF3B30',
     },
     logoutText: {
         fontSize: 16,
         color: '#FF3B30',
         flex: 1,
-        marginLeft: 15,
+        fontWeight: '500',
     },
     inputGroup: {
-        marginBottom: 15,
+        marginBottom: 16,
     },
     label: {
         fontSize: 14,
         color: '#666',
-        marginBottom: 5,
+        marginBottom: 8,
+        fontWeight: '500',
     },
-    input: {
-        backgroundColor: '#ffffff',
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f9f9f9',
         borderWidth: 1,
         borderColor: '#e0e0e0',
-        borderRadius: 8,
-        height: 45,
-        paddingHorizontal: 12,
+        borderRadius: 12,
+        height: 50,
+    },
+    inputIcon: {
+        marginHorizontal: 12,
+    },
+    input: {
+        flex: 1,
+        height: 50,
         fontSize: 16,
         color: '#333',
     },
     buttonGroup: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 10,
+        marginTop: 24,
     },
     button: {
         flex: 1,
-        height: 45,
-        borderRadius: 8,
+        height: 50,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         marginHorizontal: 5,
@@ -545,16 +660,16 @@ const styles = StyleSheet.create({
         borderColor: '#ddd',
     },
     saveButton: {
-        backgroundColor: 'rgb(51, 18, 59)',
+        backgroundColor: '#8e44ad',
     },
     cancelButtonText: {
         color: '#666',
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     saveButtonText: {
         color: '#ffffff',
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
     },
 });

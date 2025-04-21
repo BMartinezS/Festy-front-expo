@@ -12,6 +12,8 @@ import {
     Alert,
     FlatList,
     RefreshControl,
+    StatusBar,
+    Animated,
 } from 'react-native';
 import { useLocalSearchParams, Stack, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,6 +23,7 @@ import { whatsappService } from '@/services/whatsapp.service';
 import { paymentService } from '@/services/payment.service';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Componente para cada invitado
 interface Guest {
@@ -199,7 +202,7 @@ const GuestItem = ({
 
             <View style={styles.guestActions}>
                 {isLoading ? (
-                    <ActivityIndicator size="small" color="rgb(71, 25, 82)" />
+                    <ActivityIndicator size="small" color="#6a0dad" />
                 ) : (
                     <View style={styles.actionButtons}>
                         {requiresPayment && !guest.hasPaid && (
@@ -208,14 +211,18 @@ const GuestItem = ({
                                     style={styles.actionButton}
                                     onPress={generatePaymentLink}
                                 >
-                                    <Ionicons name="cash-outline" size={22} color="rgb(71, 25, 82)" />
+                                    <View style={[styles.actionButtonInner, { backgroundColor: 'rgba(106, 13, 173, 0.1)' }]}>
+                                        <Ionicons name="cash" size={18} color="#6a0dad" />
+                                    </View>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={styles.actionButton}
                                     onPress={markAsPaid}
                                 >
-                                    <Ionicons name="checkmark-circle-outline" size={22} color="#28a745" />
+                                    <View style={[styles.actionButtonInner, { backgroundColor: 'rgba(40, 167, 69, 0.1)' }]}>
+                                        <Ionicons name="checkmark-circle" size={18} color="#28a745" />
+                                    </View>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -224,7 +231,9 @@ const GuestItem = ({
                             style={styles.actionButton}
                             onPress={removeGuest}
                         >
-                            <Ionicons name="trash-outline" size={22} color="#dc3545" />
+                            <View style={[styles.actionButtonInner, { backgroundColor: 'rgba(220, 53, 69, 0.1)' }]}>
+                                <Ionicons name="trash" size={18} color="#dc3545" />
+                            </View>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -241,7 +250,6 @@ export default function GuestManagementScreen() {
     const [token, setToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [isInviteModalVisible, setInviteModalVisible] = useState(false);
     const [phoneInput, setPhoneInput] = useState('');
     const [phoneList, setPhoneList] = useState<string[]>([]);
     const [error, setError] = useState('');
@@ -249,19 +257,31 @@ export default function GuestManagementScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [groupActionLoading, setGroupActionLoading] = useState(false);
 
+    // Animación para elementos
+    const [fadeAnim] = useState(new Animated.Value(0));
+
+    // Iniciar animación cuando se monta el componente
+    React.useEffect(() => {
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
     // Cargar datos del evento y lista de invitados
     const loadEventData = useCallback(async () => {
         try {
             setLoading(true);
 
             const userToken = await AsyncStorage.getItem('userToken');
-            
+
             setToken(userToken);
             if (!userToken || !eventId) {
                 setError('No se pudo obtener la información necesaria');
                 return;
             }
-            
+
             const eventData: Event = await eventService.getEventById(userToken, eventId.toString());
             setEvent(eventData);
 
@@ -319,52 +339,11 @@ export default function GuestManagementScreen() {
         setPhoneInput('');
     };
 
-    // Remover teléfono de la lista
-    const removePhoneFromList = (phone: string) => {
-        setPhoneList(phoneList.filter(p => p !== phone));
-    };
-
-    // Enviar invitaciones
-    const sendInvitations = async () => {
-        if (phoneList.length === 0) {
-            Alert.alert('Error', 'Debes agregar al menos un número de teléfono');
-            return;
-        }
-
-        try {
-            setGroupActionLoading(true);
-
-            if (!eventId || !token) {
-                Alert.alert('Error', 'No se pudo enviar las invitaciones');
-                return;
-            }
-
-            // Invitar a los invitados
-            await eventService.inviteGuests(token, eventId.toString(), phoneList);
-
-            // Limpiar y cerrar modal
-            setPhoneList([]);
-            setInviteModalVisible(false);
-
-            // Refrescar lista de invitados
-            await loadEventData();
-
-            Alert.alert('Éxito', 'Invitaciones enviadas correctamente');
-        } catch (error) {
-            console.error('Error al enviar invitaciones:', error);
-            setError('Error al enviar invitaciones');
-            Alert.alert('Error', 'No se pudieron enviar las invitaciones');
-        } finally {
-            setGroupActionLoading(false);
-        }
-    };
-
     // Crear grupo de WhatsApp
     const createWhatsAppGroup = async () => {
         if (!event) return;
 
         try {
-
             if (!eventId || !token) {
                 Alert.alert('Error', 'No se pudo crear el grupo de WhatsApp');
                 return;
@@ -438,6 +417,7 @@ export default function GuestManagementScreen() {
         <TouchableOpacity
             style={[styles.filterButton, filter === filterName && styles.activeFilterButton]}
             onPress={() => setFilter(filterName)}
+            activeOpacity={0.7}
         >
             <Text style={[styles.filterText, filter === filterName && styles.activeFilterText]}>
                 {label}
@@ -448,7 +428,8 @@ export default function GuestManagementScreen() {
     if (loading && !refreshing) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="rgb(51, 18, 59)" />
+                <StatusBar barStyle="light-content" backgroundColor="#6a0dad" />
+                <ActivityIndicator size="large" color="#6a0dad" />
                 <Text style={styles.loadingText}>Cargando invitados...</Text>
             </View>
         );
@@ -460,52 +441,69 @@ export default function GuestManagementScreen() {
                 options={{
                     headerTitle: 'Gestión de Invitados',
                     headerShown: true,
-                    headerTintColor: 'rgb(51, 18, 59)',
+                    headerTitleStyle: { fontWeight: 'bold' },
+                    headerTintColor: '#fff',
+                    headerStyle: {
+                        backgroundColor: '#6a0dad',
+                    }
                 }}
             />
 
             <View style={styles.container}>
+                <StatusBar barStyle="light-content" backgroundColor="#6a0dad" />
+
                 {/* Panel de estadísticas */}
                 {event && (
-                    <View style={styles.statsContainer}>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>{guests.length}</Text>
-                            <Text style={styles.statLabel}>Invitados</Text>
-                        </View>
+                    <Animated.View
+                        style={[styles.statsContainer, { opacity: fadeAnim }]}
+                    >
+                        <LinearGradient
+                            colors={['#6a0dad', '#8e44ad']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.statsGradient}
+                        >
+                            <View style={styles.statItem}>
+                                <Text style={styles.statValue}>{guests.length}</Text>
+                                <Text style={styles.statLabel}>Invitados</Text>
+                            </View>
 
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>
-                                {guests.filter((g: any) => g.status === 'confirmed').length}
-                            </Text>
-                            <Text style={styles.statLabel}>Confirmados</Text>
-                        </View>
-
-                        {event.requiresPayment && (
                             <View style={styles.statItem}>
                                 <Text style={styles.statValue}>
-                                    {guests.filter((g: any) => g.hasPaid).length}
+                                    {guests.filter((g: any) => g.status === 'confirmed').length}
                                 </Text>
-                                <Text style={styles.statLabel}>Pagados</Text>
+                                <Text style={styles.statLabel}>Confirmados</Text>
                             </View>
-                        )}
-                    </View>
+
+                            {event.requiresPayment && (
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statValue}>
+                                        {guests.filter((g: any) => g.hasPaid).length}
+                                    </Text>
+                                    <Text style={styles.statLabel}>Pagados</Text>
+                                </View>
+                            )}
+                        </LinearGradient>
+                    </Animated.View>
                 )}
 
                 {/* Barra de búsqueda */}
-                <View style={styles.searchBar}>
-                    <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Buscar por número..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholderTextColor="#999"
-                    />
-                    {searchQuery ? (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color="#999" />
-                        </TouchableOpacity>
-                    ) : null}
+                <View style={styles.searchBarContainer}>
+                    <View style={styles.searchBar}>
+                        <Ionicons name="search" size={20} color="#6a0dad" style={styles.searchIcon} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Buscar por número..."
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            placeholderTextColor="#999"
+                        />
+                        {searchQuery ? (
+                            <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                <Ionicons name="close-circle" size={20} color="#999" />
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
                 </View>
 
                 {/* Filtros */}
@@ -525,7 +523,12 @@ export default function GuestManagementScreen() {
                     )}
                 </ScrollView>
 
-                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                {error ? (
+                    <View style={styles.errorContainer}>
+                        <Ionicons name="alert-circle" size={20} color="#ff4646" />
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                ) : null}
 
                 {/* Lista de invitados */}
                 <FlatList
@@ -547,11 +550,23 @@ export default function GuestManagementScreen() {
                     }}
                     contentContainerStyle={styles.guestList}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            colors={['#6a0dad']}
+                            tintColor="#6a0dad"
+                        />
                     }
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
-                            <Ionicons name="people" size={50} color="#ccc" />
+                            <View style={styles.emptyIconContainer}>
+                                <LinearGradient
+                                    colors={['#6a0dad', '#8e44ad']}
+                                    style={styles.emptyIconGradient}
+                                >
+                                    <Ionicons name="people" size={40} color="rgba(255,255,255,0.9)" />
+                                </LinearGradient>
+                            </View>
                             <Text style={styles.emptyText}>
                                 No hay invitados{filter !== 'all' ? ' en este filtro' : ''}
                             </Text>
@@ -564,113 +579,29 @@ export default function GuestManagementScreen() {
 
                 {/* Botones de acción flotantes */}
                 <View style={styles.fabContainer}>
-                    {/* Botón para crear grupo WhatsApp */}
-                    <TouchableOpacity
-                        style={[styles.fabSecondary, { right: 90 }]}
-                        onPress={createWhatsAppGroup}
-                        disabled={groupActionLoading}
-                    >
-                        {groupActionLoading ? (
-                            <ActivityIndicator size="small" color="#ffffff" />
-                        ) : (
-                            <Ionicons name="logo-whatsapp" size={24} color="#ffffff" />
-                        )}
-                    </TouchableOpacity>
-
                     {/* Botón para invitar */}
                     <TouchableOpacity
                         style={styles.fab}
-                        onPress={() => setInviteModalVisible(true)}
                         disabled={groupActionLoading}
+                        activeOpacity={0.8}
                     >
-                        {groupActionLoading ? (
-                            <ActivityIndicator size="small" color="#ffffff" />
-                        ) : (
-                            <Ionicons name="person-add" size={24} color="#ffffff" />
-                        )}
+                        <LinearGradient
+                            colors={['#6a0dad', '#8e44ad']}
+                            style={styles.fabGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            {groupActionLoading ? (
+                                <ActivityIndicator size="small" color="#ffffff" />
+                            ) : (
+                                <>
+                                    <Ionicons name="person-add" size={24} color="#ffffff" />
+                                    <Text style={styles.fabText}>Generar invitaciones</Text>
+                                </>
+                            )}
+                        </LinearGradient>
                     </TouchableOpacity>
                 </View>
-
-                {/* Modal para invitar */}
-                <Modal
-                    visible={isInviteModalVisible}
-                    transparent={true}
-                    animationType="slide"
-                    onRequestClose={() => setInviteModalVisible(false)}
-                >
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Invitar Personas</Text>
-
-                            <View style={styles.phoneInputContainer}>
-                                <TextInput
-                                    style={styles.phoneInput}
-                                    placeholder="Número de teléfono (+56...)"
-                                    value={phoneInput}
-                                    onChangeText={setPhoneInput}
-                                    keyboardType="phone-pad"
-                                    placeholderTextColor="#999"
-                                />
-                                <TouchableOpacity
-                                    style={styles.addPhoneButton}
-                                    onPress={addPhoneToList}
-                                >
-                                    <Ionicons name="add" size={24} color="#ffffff" />
-                                </TouchableOpacity>
-                            </View>
-
-                            <Text style={styles.listTitle}>Números a invitar:</Text>
-
-                            <ScrollView style={styles.phoneList}>
-                                {phoneList.length > 0 ? (
-                                    phoneList.map((phone, index) => (
-                                        <View key={index} style={styles.phoneItem}>
-                                            <Text style={styles.phoneItemText}>{phone}</Text>
-                                            <TouchableOpacity
-                                                onPress={() => removePhoneFromList(phone)}
-                                                style={styles.removePhoneButton}
-                                            >
-                                                <Ionicons name="close-circle" size={20} color="#dc3545" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    ))
-                                ) : (
-                                    <Text style={styles.emptyListText}>
-                                        Agrega teléfonos para invitar
-                                    </Text>
-                                )}
-                            </ScrollView>
-
-                            <View style={styles.modalButtons}>
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.cancelButton]}
-                                    onPress={() => {
-                                        setPhoneList([]);
-                                        setInviteModalVisible(false);
-                                    }}
-                                >
-                                    <Text style={styles.cancelButtonText}>Cancelar</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[
-                                        styles.modalButton,
-                                        styles.inviteButton,
-                                        phoneList.length === 0 && styles.disabledButton
-                                    ]}
-                                    onPress={sendInvitations}
-                                    disabled={phoneList.length === 0 || groupActionLoading}
-                                >
-                                    {groupActionLoading ? (
-                                        <ActivityIndicator size="small" color="#ffffff" />
-                                    ) : (
-                                        <Text style={styles.inviteButtonText}>Invitar</Text>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
             </View>
         </>
     );
@@ -685,60 +616,75 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#f8f9fa',
     },
     loadingText: {
-        marginTop: 10,
+        marginTop: 12,
         fontSize: 16,
-        color: 'rgb(71, 25, 82)',
+        fontWeight: '500',
+        color: '#6a0dad',
+    },
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ffebee',
+        marginHorizontal: 15,
+        marginBottom: 10,
+        padding: 10,
+        borderRadius: 8,
     },
     errorText: {
         color: '#ff4646',
-        textAlign: 'center',
-        marginVertical: 10,
-        paddingHorizontal: 15,
+        marginLeft: 8,
+        fontSize: 14,
+        flex: 1,
     },
     statsContainer: {
-        flexDirection: 'row',
-        backgroundColor: '#ffffff',
-        borderRadius: 10,
-        marginHorizontal: 15,
-        marginTop: 15,
-        paddingVertical: 15,
-        borderWidth: 1,
-        borderColor: '#eee',
+        margin: 15,
+        marginBottom: 10,
+        borderRadius: 16,
+        overflow: 'hidden',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 5,
+    },
+    statsGradient: {
+        flexDirection: 'row',
+        padding: 20,
     },
     statItem: {
         flex: 1,
         alignItems: 'center',
-        borderRightWidth: 1,
-        borderRightColor: '#eee',
     },
     statValue: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
+        color: '#ffffff',
     },
     statLabel: {
-        fontSize: 12,
-        color: '#666',
+        fontSize: 13,
+        fontWeight: '500',
+        color: 'rgba(255, 255, 255, 0.8)',
         marginTop: 5,
+    },
+    searchBarContainer: {
+        paddingHorizontal: 15,
+        marginBottom: 5,
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#ffffff',
-        marginHorizontal: 15,
-        marginTop: 15,
         paddingHorizontal: 15,
         height: 50,
         borderRadius: 25,
-        borderWidth: 1,
-        borderColor: '#eee',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
     },
     searchIcon: {
         marginRight: 10,
@@ -750,9 +696,8 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     filtersContainer: {
-        flexDirection: 'row',
         paddingHorizontal: 15,
-        paddingVertical: 15,
+        paddingVertical: 10,
     },
     filterButton: {
         paddingHorizontal: 15,
@@ -760,47 +705,48 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         marginRight: 10,
         backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#eee',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 1,
     },
     activeFilterButton: {
-        backgroundColor: 'rgb(51, 18, 59)',
-        borderColor: 'rgb(51, 18, 59)',
+        backgroundColor: '#6a0dad',
     },
     filterText: {
         fontSize: 14,
-        color: '#666',
+        color: '#555',
+        fontWeight: '500',
     },
     activeFilterText: {
         color: '#ffffff',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     guestList: {
         padding: 15,
-        paddingBottom: 80, // Espacio para el FAB
+        paddingBottom: 90, // Espacio para el FAB
     },
     guestCard: {
         flexDirection: 'row',
         backgroundColor: '#ffffff',
         padding: 15,
-        borderRadius: 10,
+        borderRadius: 12,
         marginBottom: 10,
-        borderWidth: 1,
-        borderColor: '#eee',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
+        shadowRadius: 3,
+        elevation: 3,
     },
     guestInfo: {
         flex: 1,
     },
     guestPhone: {
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
         color: '#333',
-        marginBottom: 5,
+        marginBottom: 8,
     },
     statusRow: {
         flexDirection: 'row',
@@ -808,10 +754,10 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
     },
     badge: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
         borderRadius: 20,
-        marginRight: 5,
+        marginRight: 6,
         marginBottom: 5,
     },
     confirmedBadge: {
@@ -845,30 +791,44 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     actionButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        marginLeft: 5,
+    },
+    actionButtonInner: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#f0f0f0',
-        marginLeft: 5,
     },
     emptyContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 30,
+        paddingVertical: 40,
+    },
+    emptyIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        overflow: 'hidden',
+        marginBottom: 16,
+    },
+    emptyIconGradient: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     emptyText: {
         fontSize: 18,
-        color: '#666',
-        marginTop: 10,
-        fontWeight: '500',
+        color: '#555',
+        fontWeight: '600',
+        marginBottom: 8,
     },
     emptySubtext: {
         fontSize: 14,
-        color: '#999',
-        marginTop: 5,
+        color: '#888',
         textAlign: 'center',
+        maxWidth: '80%',
     },
     fabContainer: {
         position: 'absolute',
@@ -876,17 +836,21 @@ const styles = StyleSheet.create({
         bottom: 20,
     },
     fab: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: 'rgb(51, 18, 59)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 5,
+        width: 150,
+        height: 60,
+        borderRadius: 10,
+        overflow: 'hidden',
+        elevation: 6,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.27,
-        shadowRadius: 4.65,
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+    },
+    fabGradient: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     fabSecondary: {
         position: 'absolute',
@@ -904,70 +868,87 @@ const styles = StyleSheet.create({
     },
     modalContainer: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    blurView: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
     modalContent: {
         backgroundColor: '#ffffff',
-        borderRadius: 10,
-        padding: 20,
-        width: '90%',
-        maxHeight: '80%',
-        elevation: 5,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 24,
+        paddingBottom: 40,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.27,
-        shadowRadius: 4.65,
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+        elevation: 10,
     },
     modalTitle: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: 'bold',
-        color: 'rgb(51, 18, 59)',
+        color: '#333',
         marginBottom: 20,
         textAlign: 'center',
     },
     phoneInputContainer: {
         flexDirection: 'row',
+        alignItems: 'center',
         marginBottom: 20,
+    },
+    phoneInputWrapper: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f5f5f5',
+        borderRadius: 12,
+        paddingHorizontal: 15,
+        height: 50,
+        marginRight: 10,
+    },
+    phoneInputIcon: {
+        marginRight: 10,
     },
     phoneInput: {
         flex: 1,
-        height: 45,
-        backgroundColor: '#ffffff',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 10,
-        paddingHorizontal: 15,
+        height: '100%',
         fontSize: 16,
         color: '#333',
-        marginRight: 10,
     },
     addPhoneButton: {
-        width: 45,
-        height: 45,
-        backgroundColor: 'rgb(51, 18, 59)',
-        borderRadius: 10,
+        width: 50,
+        height: 50,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    addPhoneGradient: {
+        width: '100%',
+        height: '100%',
         justifyContent: 'center',
         alignItems: 'center',
     },
     listTitle: {
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
         color: '#333',
-        marginBottom: 10,
+        marginBottom: 12,
     },
     phoneList: {
-        maxHeight: 200,
+        maxHeight: 220,
         marginBottom: 20,
     },
     phoneItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f5f5f5',
-        paddingVertical: 10,
+        backgroundColor: '#f8f8f8',
+        paddingVertical: 12,
         paddingHorizontal: 15,
-        borderRadius: 8,
+        borderRadius: 12,
         marginBottom: 8,
     },
     phoneItemText: {
@@ -978,11 +959,19 @@ const styles = StyleSheet.create({
     removePhoneButton: {
         padding: 5,
     },
+    removePhoneButtonInner: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     emptyListText: {
         textAlign: 'center',
         color: '#999',
         fontStyle: 'italic',
-        paddingVertical: 20,
+        paddingVertical: 30,
     },
     modalButtons: {
         flexDirection: 'row',
@@ -990,8 +979,8 @@ const styles = StyleSheet.create({
     },
     modalButton: {
         flex: 1,
-        height: 45,
-        borderRadius: 8,
+        height: 50,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         marginHorizontal: 5,
@@ -999,10 +988,10 @@ const styles = StyleSheet.create({
     cancelButton: {
         backgroundColor: '#f5f5f5',
         borderWidth: 1,
-        borderColor: '#ddd',
+        borderColor: '#e0e0e0',
     },
     inviteButton: {
-        backgroundColor: 'rgb(51, 18, 59)',
+        backgroundColor: '#6a0dad',
     },
     disabledButton: {
         opacity: 0.5,
@@ -1010,11 +999,16 @@ const styles = StyleSheet.create({
     cancelButtonText: {
         color: '#666',
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     inviteButtonText: {
         color: '#ffffff',
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
     },
+    fabText: {
+        color: '#ffffff',
+        fontWeight: '600',
+        fontSize: 16,
+    }
 });

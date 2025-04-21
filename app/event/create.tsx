@@ -29,7 +29,6 @@ export default function CreateEventScreen() {
     const [form, setForm] = useState<EventForm>(INITIAL_FORM_STATE);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [initialCalculationDone, setInitialCalculationDone] = useState(false);
 
     // Función para actualizar el formulario
     const updateForm = useCallback((field: keyof EventForm, value: any) => {
@@ -68,8 +67,6 @@ export default function CreateEventScreen() {
             if (!form.cuotaAmount || form.cuotaAmount === '0' || isNaN(Number(form.cuotaAmount))) {
                 updateForm('cuotaAmount', cuotaRedondeada.toString());
             }
-
-            setInitialCalculationDone(true);
         }
     }, [form.productos, form.cantidadInvitados, form.requiresPayment]);
 
