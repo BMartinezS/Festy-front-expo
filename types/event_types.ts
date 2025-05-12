@@ -1,15 +1,3 @@
-interface GetEventDto {
-    _id: string;
-}
-
-interface EventAnfitrion {
-    _id: string;
-    createdAt: Date;
-    email: string;
-    name: string;
-}
-
-
 interface Product {
     externalId: string;
     name: string;
