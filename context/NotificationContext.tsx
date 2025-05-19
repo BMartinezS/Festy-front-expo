@@ -1,13 +1,13 @@
 // src/context/NotificationContext.tsx
-import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
-import { Alert, AppState, AppStateStatus } from 'react-native';
+import React, { createContext, useState, useEffect, useContext, useRef, useCallback } from 'react';
+import { Alert, AppState, AppStateStatus, Platform } from 'react-native';
 import io, { Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as Notifications from 'expo-notifications';
 import { Subscription } from 'expo-notifications';
 import NotificationService from '../services/notification.service';
-import { API_URL } from '../constants';
+import { API_URL, SOCKET_URL } from '../constants';
 import userService from '../services/user.service';
 
 // Definir el tipo de notificación
@@ -28,6 +28,7 @@ interface NotificationContextType {
     markAsRead: (notificationId: string) => Promise<void>;
     markAllAsRead: () => Promise<void>;
     loading: boolean;
+    error: string | null;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
@@ -37,6 +38,7 @@ const NotificationContext = createContext<NotificationContextType>({
     markAsRead: async () => { },
     markAllAsRead: async () => { },
     loading: false,
+    error: null,
 });
 
 interface NotificationProviderProps {
@@ -49,11 +51,64 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     const [socket, setSocket] = useState<any | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+    const [isWebReady, setIsWebReady] = useState<boolean>(false);
 
     const notificationReceivedListener = useRef<Subscription>();
     const notificationResponseListener = useRef<Subscription>();
+
+    // Check if web is ready for badge updates
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            if (document.readyState === 'complete') {
+                setIsWebReady(true);
+            } else {
+                const handleDocumentLoad = () => {
+                    setIsWebReady(true);
+                };
+                window.addEventListener('load', handleDocumentLoad);
+                return () => {
+                    window.removeEventListener('load', handleDocumentLoad);
+                };
+            }
+        } else {
+            setIsWebReady(true); // On mobile platforms, we're always "ready"
+        }
+    }, []);
+
+    // Función para actualizar el contador de notificaciones no leídas y el badge
+    const updateUnreadCount = useCallback((count: number) => {
+        setUnreadCount(count);
+        console.log('Contador de no leídas actualizado:', count);
+
+        // Only attempt badge updates if we're on a mobile platform or web is ready
+        if (isWebReady) {
+            NotificationService.setBadgeCount(count).catch(err => {
+                console.warn('Failed to update badge count:', err);
+                // Non-fatal error, continue execution
+            });
+        }
+    }, [isWebReady]);
+
+    // Cargar ID de usuario y token al inicio
+    useEffect(() => {
+        const loadUserData = async () => {
+            try {
+                const id = await userService.getUserId();
+                const userToken = await AsyncStorage.getItem('userToken');
+
+                if (id) setUserId(id);
+                if (userToken) setToken(userToken);
+            } catch (error) {
+                console.error('Error loading user data:', error);
+                setError('Error al cargar datos del usuario');
+            }
+        };
+
+        loadUserData();
+    }, []);
 
     // Configurar listeners de notificaciones de Expo
     useEffect(() => {
@@ -95,9 +150,37 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         };
     }, []);
 
+    // Función para cargar notificaciones desde la API
+    const fetchNotifications = useCallback(async () => {
+        if (!userId || !token) {
+            console.log('No hay userId o token disponible');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await axios.get(`${API_URL}/notifications/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.data) {
+                setNotifications(response.data);
+                const unread = response.data.filter((n: Notification) => !n.read).length;
+                updateUnreadCount(unread);
+            }
+        } catch (error: any) {
+            console.error('Error fetching notifications:', error);
+            setError(error.response?.data?.message || 'Error al cargar notificaciones');
+        } finally {
+            setLoading(false);
+        }
+    }, [userId, token, updateUnreadCount]);
+
     // Monitorear cambios de estado de la app
     useEffect(() => {
-        console.log('Estado de la app:', appState);
         const subscription = AppState.addEventListener('change', nextAppState => {
             setAppState(nextAppState);
 
@@ -105,41 +188,28 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
             if (appState.match(/inactive|background/) && nextAppState === 'active') {
                 console.log('App ha vuelto a primer plano');
                 fetchNotifications();
-                // Resetear el contador de badge
-                NotificationService.setBadgeCount(0);
+
+                // Solo intentar resetear el badge si la web está lista
+                if (isWebReady) {
+                    NotificationService.setBadgeCount(0).catch(err => {
+                        console.warn('Failed to reset badge count:', err);
+                        // Non-fatal error, continue execution
+                    });
+                }
             }
         });
 
         return () => {
             subscription.remove();
         };
-    }, [appState]);
-
-    // Cargar ID de usuario y token al inicio
-    useEffect(() => {
-        const loadUserData = async () => {
-            try {
-                const id = await userService.getUserId();
-                console.log('userId en loaduserdata:', id);
-                const authToken = await AsyncStorage.getItem('userToken');
-                console.log('token en loaduserdata:', authToken);
-
-                if (id) setUserId(id);
-                if (authToken) setToken(authToken);
-            } catch (error) {
-                console.error('Error loading user data:', error);
-            }
-        };
-
-        loadUserData();
-    }, []);
+    }, [appState, fetchNotifications, isWebReady]);
 
     // Configurar Socket.io cuando el ID de usuario esté disponible
     useEffect(() => {
         if (!userId) return;
 
         // Conectar a Socket.io
-        const newSocket = io(API_URL, {
+        const newSocket = io(SOCKET_URL, {
             query: { userId },
             transports: ['websocket']
         });
@@ -151,7 +221,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         newSocket.on('new-notification', (notification: Notification) => {
             // Actualizar el estado interno de notificaciones
             setNotifications(prev => [notification, ...prev]);
-            setUnreadCount(count => count + 1);
+
+            // Actualizar contador de no leídas
+            updateUnreadCount(unreadCount + 1);
 
             // Mostrar una notificación según el estado de la app
             if (appState !== 'active') {
@@ -161,9 +233,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
                     body: notification.message,
                     data: { notificationId: notification._id }
                 });
-
-                // Actualizar el badge count
-                NotificationService.setBadgeCount(unreadCount + 1);
             } else {
                 // App en primer plano - mostrar alerta
                 Alert.alert('Nueva notificación', notification.message);
@@ -172,6 +241,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
         newSocket.on('connect_error', (error: any) => {
             console.error('Socket connection error:', error);
+            setError('Error de conexión con el servidor de notificaciones');
         });
 
         setSocket(newSocket);
@@ -182,84 +252,57 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         return () => {
             if (newSocket) newSocket.disconnect();
         };
-    }, [userId]);
-
-    // Función para cargar notificaciones desde la API
-    const fetchNotifications = async () => {
-        console.log('userId:', userId);
-        console.log('token:', token);
-        if (!userId || !token) return;
-
-        try {
-            setLoading(true);
-            const response = await axios.get(`${API_URL}/api/notifications/${userId}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.data) {
-                setNotifications(response.data);
-                const unread = response.data.filter((n: Notification) => !n.read).length;
-                setUnreadCount(unread);
-
-                // Actualizar el badge count
-                NotificationService.setBadgeCount(unread);
-            }
-        } catch (error) {
-            console.error('Error fetching notifications:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [userId, fetchNotifications, updateUnreadCount, unreadCount, appState]);
 
     // Marcar notificación como leída
-    const markAsRead = async (notificationId: string) => {
+    const markAsRead = useCallback(async (notificationId: string) => {
         if (!token) return;
 
         try {
-            await axios.patch(`${API_URL}/api/notifications/${notificationId}`, {}, {
+            setError(null);
+            await axios.patch(`${API_URL}/notifications/${notificationId}`, {}, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
-            setNotifications(notifications.map(notification =>
+            setNotifications(prev => prev.map(notification =>
                 notification._id === notificationId
                     ? { ...notification, read: true }
                     : notification
             ));
 
-            const newUnreadCount = Math.max(0, unreadCount - 1);
-            setUnreadCount(newUnreadCount);
-
-            // Actualizar el badge count
-            NotificationService.setBadgeCount(newUnreadCount);
-        } catch (error) {
+            // Calcular nuevo contador de no leídas basado en el estado actual
+            setNotifications(prev => {
+                const newUnreadCount = prev.filter(n => !n.read).length;
+                updateUnreadCount(newUnreadCount);
+                return prev;
+            });
+        } catch (error: any) {
             console.error('Error marking notification as read:', error);
+            setError(error.response?.data?.message || 'Error al marcar notificación como leída');
         }
-    };
+    }, [token, updateUnreadCount]);
 
     // Marcar todas como leídas
-    const markAllAsRead = async () => {
+    const markAllAsRead = useCallback(async () => {
         if (!userId || !token) return;
 
         try {
-            await axios.patch(`${API_URL}/api/notifications/${userId}/mark-all`, {}, {
+            setError(null);
+            await axios.patch(`${API_URL}/notifications/${userId}/mark-all`, {}, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
-            setNotifications(notifications.map(notification => ({ ...notification, read: true })));
-            setUnreadCount(0);
-
-            // Actualizar el badge count
-            NotificationService.setBadgeCount(0);
-        } catch (error) {
+            setNotifications(prev => prev.map(notification => ({ ...notification, read: true })));
+            updateUnreadCount(0);
+        } catch (error: any) {
             console.error('Error marking all as read:', error);
+            setError(error.response?.data?.message || 'Error al marcar todas las notificaciones como leídas');
         }
-    };
+    }, [userId, token, updateUnreadCount]);
 
     // Valor del contexto
     const value = {
@@ -268,7 +311,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         fetchNotifications,
         markAsRead,
         markAllAsRead,
-        loading
+        loading,
+        error
     };
 
     return (

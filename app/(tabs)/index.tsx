@@ -93,6 +93,7 @@ export default function HomeScreen() {
   const handleCreateEventPress = () => router.push('/event');
   const handleJoinEventPress = () => router.push('/guest');
   const handleProfilePress = () => router.push('/profile');
+  const handleNotificationsPress = () => router.push('/notification');
 
   return (
     <View style={styles.container}>
@@ -168,6 +169,21 @@ export default function HomeScreen() {
               <Ionicons name="person" size={32} color="white" />
             </LinearGradient>
             <Text style={styles.actionButtonText}>Mi Perfil</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleNotificationsPress}
+          >
+            <LinearGradient
+              colors={['#9b59b6', '#b16bce']}
+              style={styles.actionButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="person" size={32} color="white" />
+            </LinearGradient>
+            <Text style={styles.actionButtonText}>Notificaciones</Text>
           </TouchableOpacity>
         </Animated.View>
 
@@ -253,7 +269,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   actionButton: {
-    width: width / 3.5,
+    width: width / 5,
     alignItems: 'center',
     justifyContent: 'center',
   },

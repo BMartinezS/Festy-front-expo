@@ -7,8 +7,8 @@ class UserService {
     async getUserProfile() {
         try {
 
-            const authToken = AsyncStorage.getItem('authToken');
-            if (!authToken) {
+            const userToken = AsyncStorage.getItem('userToken');
+            if (!userToken) {
                 throw new Error('No authentication token found');
             }
 
@@ -16,7 +16,7 @@ class UserService {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
+                    'Authorization': `Bearer ${userToken}`
                 }
             });
 
@@ -34,16 +34,18 @@ class UserService {
 
     async getUserId() {
         try {
-            const authToken = await AsyncStorage.getItem('authToken');
-            if (!authToken) {
+            const userToken = await AsyncStorage.getItem('userToken');
+            if (!userToken) {
                 throw new Error('No authentication token found');
             }
+
+            console.log('Auth Token:', userToken);
 
             const response = await fetch(`${API_URL}/user/profile`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
+                    'Authorization': `Bearer ${userToken}`
                 }
             });
 
