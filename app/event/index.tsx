@@ -1,4 +1,3 @@
-// app/(tabs)/events.tsx
 import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
@@ -10,6 +9,7 @@ import {
     Image,
     StatusBar,
     Animated,
+    Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,34 +17,29 @@ import { Event, eventService } from '@/services/event.service';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
+const { width } = Dimensions.get('window');
+
 export default function EventsScreen() {
     const [events, setEvents] = useState<Event[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'active', 'upcoming', 'past'
+    const [activeFilter, setActiveFilter] = useState('all');
     const [scrollY] = useState(new Animated.Value(0));
-
-    // Animación para los elementos que aparecen
     const [fadeAnim] = useState(new Animated.Value(0));
 
-    // Cargar eventos al montar el componente
     useEffect(() => {
         loadEvents();
-
-        // Iniciar animación
         Animated.timing(fadeAnim, {
             toValue: 1,
-            duration: 600,
+            duration: 800,
             useNativeDriver: true,
         }).start();
     }, []);
 
-    // Función para cargar los eventos
     const loadEvents = async () => {
         try {
             setRefreshing(true);
-
             const token = await AsyncStorage.getItem('userToken');
             if (!token) {
                 router.replace('/auth/login');
@@ -52,7 +47,6 @@ export default function EventsScreen() {
             }
 
             const response = await eventService.getEvents(token);
-
             if ('error' in response) {
                 setError(response.error);
                 setEvents([]);
@@ -70,10 +64,8 @@ export default function EventsScreen() {
         }
     };
 
-    // Función para filtrar eventos según el filtro activo
     const getFilteredEvents = () => {
         const now = new Date();
-
         switch (activeFilter) {
             case 'active':
                 return events.filter(event => event.status === 'active');
@@ -86,90 +78,127 @@ export default function EventsScreen() {
         }
     };
 
-    // Función para renderizar cada evento en la lista
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'active':
+                return 'Activo';
+            case 'completed':
+                return 'Finalizado';
+            case 'cancelled':
+                return 'Cancelado';
+            default:
+                return 'Borrador';
+        }
+    };
+
     const renderEventCard = ({ item: event, index }: { item: Event, index: number }) => {
         const eventDate = new Date(event.fechaInicio);
 
         return (
             <Animated.View
-                style={{
-                    opacity: fadeAnim,
-                    transform: [{
-                        translateY: fadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [50, 0]
-                        })
-                    }],
-                    marginBottom: 15
-                }}
+                style={[
+                    styles.cardWrapper,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{
+                            translateY: fadeAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [30, 0]
+                            })
+                        }]
+                    }
+                ]}
             >
                 <TouchableOpacity
                     style={styles.card}
                     onPress={() => router.push(`/event/${event._id}`)}
-                    activeOpacity={0.8}
+                    activeOpacity={0.95}
                 >
-                    <View style={styles.cardImageContainer}>
+                    {/* Header del card con imagen/placeholder */}
+                    <View style={styles.cardHeader}>
                         {event.imagen ? (
                             <Image source={{ uri: event.imagen }} style={styles.cardImage} />
                         ) : (
                             <LinearGradient
-                                colors={['#8e44ad', '#6a0dad']}
+                                colors={['#8B5CF6', '#7C3AED']}
                                 style={styles.cardImagePlaceholder}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
                             >
-                                <Ionicons name="calendar" size={36} color="rgba(255,255,255,0.9)" />
+                                <Ionicons name="calendar-outline" size={32} color="rgba(255,255,255,0.9)" />
                             </LinearGradient>
                         )}
 
-                        <View style={[
-                            styles.statusBadge,
-                            event.status === 'active' ? styles.activeBadge :
-                                event.status === 'completed' ? styles.completedBadge :
-                                    event.status === 'cancelled' ? styles.cancelledBadge :
-                                        styles.draftBadge
-                        ]}>
-                            <Text style={styles.statusText}>
-                                {event.status.toUpperCase()}
-                            </Text>
+                        {/* Badge de estado */}
+                        <View style={styles.statusBadgeContainer}>
+                            <LinearGradient
+                                colors={['#8B5CF6', '#7C3AED']}
+                                style={styles.statusBadge}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                            >
+                                <Text style={styles.statusText}>
+                                    {getStatusLabel(event.status)}
+                                </Text>
+                            </LinearGradient>
                         </View>
+
+                        {/* Decoración superior */}
+                        <View style={styles.cardDecoration} />
                     </View>
 
+                    {/* Contenido del card */}
                     <View style={styles.cardContent}>
-                        <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
+                        <Text style={styles.cardTitle} numberOfLines={2} ellipsizeMode="tail">
                             {event.nombre}
                         </Text>
 
-                        <View style={styles.cardInfo}>
-                            <View style={styles.infoItem}>
-                                <Ionicons name="time" size={16} color="#8e44ad" />
-                                <Text style={styles.infoText}>
-                                    {eventDate.toLocaleDateString()} {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <View style={styles.cardDetails}>
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <Ionicons name="time-outline" size={16} color="#8B5CF6" />
+                                </View>
+                                <Text style={styles.detailText}>
+                                    {eventDate.toLocaleDateString('es-ES', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric'
+                                    })} • {eventDate.toLocaleTimeString('es-ES', {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })}
                                 </Text>
                             </View>
 
-                            <View style={styles.infoItem}>
-                                <Ionicons name="location" size={16} color="#8e44ad" />
-                                <Text style={styles.infoText} numberOfLines={1} ellipsizeMode="tail">
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <Ionicons name="location-outline" size={16} color="#06B6D4" />
+                                </View>
+                                <Text style={styles.detailText} numberOfLines={1} ellipsizeMode="tail">
                                     {event.ubicacion.address}
                                 </Text>
                             </View>
 
-                            <View style={styles.infoItem}>
-                                <Ionicons name="people" size={16} color="#8e44ad" />
-                                <Text style={styles.infoText}>
-                                    {event.invitados.length} / {event.cantidadInvitados || 0} invitados
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <Ionicons name="people-outline" size={16} color="#F59E0B" />
+                                </View>
+                                <Text style={styles.detailText}>
+                                    {event.invitados.length} de {event.cantidadInvitados || 0} invitados
                                 </Text>
                             </View>
                         </View>
 
+                        {/* Información de pago */}
                         {event.requiresPayment && (
                             <View style={styles.paymentContainer}>
                                 <LinearGradient
-                                    colors={['#8e44ad', '#9b59b6']}
+                                    colors={['#8B5CF6', '#7C3AED']}
+                                    style={styles.paymentBadge}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
-                                    style={styles.paymentInfo}
                                 >
-                                    <Ionicons name="cash" size={16} color="#fff" />
+                                    <Ionicons name="card-outline" size={14} color="#fff" />
                                     <Text style={styles.paymentText}>
                                         ${event.cuotaAmount} por persona
                                     </Text>
@@ -182,133 +211,151 @@ export default function EventsScreen() {
         );
     };
 
-    // Función para renderizar estado vacío
     const renderEmptyState = () => (
         <Animated.View
-            style={[
-                styles.emptyContainer,
-                { opacity: fadeAnim }
-            ]}
+            style={[styles.emptyContainer, { opacity: fadeAnim }]}
         >
-            <View style={styles.emptyIconContainer}>
+            <View style={styles.emptyIllustration}>
                 <LinearGradient
-                    colors={['#8e44ad', '#6a0dad']}
+                    colors={['#8B5CF6', '#7C3AED']}
                     style={styles.emptyIconGradient}
                 >
-                    <Ionicons name="calendar" size={40} color="white" />
+                    <Ionicons name="calendar-outline" size={48} color="white" />
                 </LinearGradient>
+                <View style={styles.emptyDecorations}>
+                    <View style={styles.emptyDot1} />
+                    <View style={styles.emptyDot2} />
+                    <View style={styles.emptyDot3} />
+                </View>
             </View>
-            <Text style={styles.emptyTitle}>No hay eventos</Text>
+
+            <Text style={styles.emptyTitle}>Sin eventos aún</Text>
             <Text style={styles.emptySubtitle}>
-                ¡Crea tu primer evento usando el botón + en la esquina inferior!
+                ¡Organiza tu primer evento y comienza a crear momentos increíbles con tus amigos!
             </Text>
+
             <TouchableOpacity
-                style={styles.emptyButton}
+                style={styles.createButton}
                 onPress={() => router.push('/event/create')}
+                activeOpacity={0.9}
             >
-                <Text style={styles.emptyButtonText}>Crear evento</Text>
+                <LinearGradient
+                    colors={['#8B5CF6', '#7C3AED']}
+                    style={styles.createButtonGradient}
+                >
+                    <Ionicons name="add" size={20} color="white" />
+                    <Text style={styles.createButtonText}>Crear mi primer evento</Text>
+                </LinearGradient>
             </TouchableOpacity>
         </Animated.View>
     );
 
-    // Transformar el header mientras se hace scroll
-    const headerHeight = scrollY.interpolate({
-        inputRange: [0, 100],
-        outputRange: [150, 80],
-        extrapolate: 'clamp'
-    });
-
-    const headerTitleSize = scrollY.interpolate({
-        inputRange: [0, 100],
-        outputRange: [24, 20],
-        extrapolate: 'clamp'
-    });
-
-    const headerTitleOpacity = scrollY.interpolate({
-        inputRange: [0, 40, 70],
-        outputRange: [1, 0.3, 1],
-        extrapolate: 'clamp'
-    });
-
-    const headerTitlePosition = scrollY.interpolate({
-        inputRange: [0, 100],
-        outputRange: [0, 8],
-        extrapolate: 'clamp'
-    });
-
-    // Función para renderizar los filtros
     const renderFilters = () => (
         <View style={styles.filterContainer}>
-            {['all', 'active', 'upcoming', 'past'].map((filter) => (
-                <TouchableOpacity
-                    key={filter}
-                    style={[
-                        styles.filterButton,
-                        activeFilter === filter && styles.activeFilterButton
-                    ]}
-                    onPress={() => setActiveFilter(filter)}
-                >
-                    <Text
+            <View style={styles.filterScrollWrapper}>
+                {[
+                    { key: 'all', label: 'Todos', count: events.length },
+                    { key: 'active', label: 'Activos', count: events.filter(e => e.status === 'active').length },
+                    { key: 'upcoming', label: 'Próximos', count: events.filter(e => new Date(e.fechaInicio) > new Date()).length },
+                    { key: 'past', label: 'Pasados', count: events.filter(e => new Date(e.fechaInicio) < new Date() && e.status !== 'draft').length }
+                ].map((filter) => (
+                    <TouchableOpacity
+                        key={filter.key}
                         style={[
-                            styles.filterText,
-                            activeFilter === filter && styles.activeFilterText
+                            styles.filterChip,
+                            activeFilter === filter.key && styles.activeFilterChip
                         ]}
+                        onPress={() => setActiveFilter(filter.key)}
+                        activeOpacity={0.8}
                     >
-                        {filter === 'all' ? 'Todos' :
-                            filter === 'active' ? 'Activos' :
-                                filter === 'upcoming' ? 'Próximos' : 'Pasados'}
-                    </Text>
-                </TouchableOpacity>
-            ))}
+                        {activeFilter === filter.key && (
+                            <LinearGradient
+                                colors={['#8B5CF6', '#7C3AED']}
+                                style={styles.filterChipGradient}
+                            />
+                        )}
+                        <Text
+                            style={[
+                                styles.filterText,
+                                activeFilter === filter.key && styles.activeFilterText
+                            ]}
+                        >
+                            {filter.label}
+                        </Text>
+                        {filter.count > 0 && (
+                            <View style={[
+                                styles.filterBadge,
+                                activeFilter === filter.key && styles.activeFilterBadge
+                            ]}>
+                                <Text style={[
+                                    styles.filterBadgeText,
+                                    activeFilter === filter.key && styles.activeFilterBadgeText
+                                ]}>
+                                    {filter.count}
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                ))}
+            </View>
         </View>
     );
 
+    const headerHeight = scrollY.interpolate({
+        inputRange: [0, 100],
+        outputRange: [120, 80],
+        extrapolate: 'clamp'
+    });
+
+    const headerOpacity = scrollY.interpolate({
+        inputRange: [0, 50],
+        outputRange: [1, 0.9],
+        extrapolate: 'clamp'
+    });
+
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
 
-            {/* Header con animación */}
-            <Animated.View style={[styles.header, { height: headerHeight }]}>
+            {/* Header animado */}
+            <Animated.View style={[styles.header, { height: headerHeight, opacity: headerOpacity }]}>
                 <LinearGradient
-                    colors={['#6a0dad', '#9b59b6']}
+                    colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
+                    style={styles.headerGradient}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.headerGradient}
                 >
-                    <Animated.Text
-                        style={[
-                            styles.headerTitle,
-                            {
-                                fontSize: headerTitleSize,
-                                opacity: headerTitleOpacity,
-                                transform: [{ translateY: headerTitlePosition }]
-                            }
-                        ]}
-                    >
-                        Mis Eventos
-                    </Animated.Text>
+                    <View style={styles.headerDecorations}>
+                        <View style={styles.headerCircle} />
+                        <View style={styles.headerShape} />
+                    </View>
+                    <View style={styles.headerContent}>
+                        <Text style={styles.headerTitle}>Mis Eventos</Text>
+                        <Text style={styles.headerSubtitle}>
+                            {events.length} {events.length === 1 ? 'evento' : 'eventos'} creados
+                        </Text>
+                    </View>
                 </LinearGradient>
             </Animated.View>
 
             {/* Filtros */}
             {renderFilters()}
 
-            {/* Mensaje de error */}
+            {/* Error */}
             {error ? (
                 <View style={styles.errorContainer}>
-                    <Ionicons name="alert-circle" size={24} color="#ff4646" />
-                    <Text style={styles.errorText}>{error}</Text>
+                    <View style={styles.errorContent}>
+                        <Ionicons name="alert-circle-outline" size={20} color="#EF4444" />
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
                 </View>
             ) : null}
 
-            {/* Lista de eventos o pantalla de carga */}
+            {/* Lista de eventos */}
             {loading ? (
-                <View style={styles.loaderContainer}>
-                    <ActivityIndicator
-                        size="large"
-                        color="#6a0dad"
-                    />
-                    <Text style={styles.loaderText}>Cargando eventos...</Text>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#8B5CF6" />
+                    <Text style={styles.loadingText}>Cargando eventos...</Text>
                 </View>
             ) : (
                 <Animated.FlatList
@@ -323,8 +370,8 @@ export default function EventsScreen() {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={loadEvents}
-                            colors={['#6a0dad']}
-                            tintColor="#6a0dad"
+                            colors={['#8B5CF6']}
+                            tintColor="#8B5CF6"
                         />
                     }
                     ListEmptyComponent={renderEmptyState}
@@ -337,17 +384,17 @@ export default function EventsScreen() {
                 />
             )}
 
-            {/* Botón flotante para crear evento */}
+            {/* FAB */}
             <TouchableOpacity
                 style={styles.fab}
                 onPress={() => router.push('/event/create')}
-                activeOpacity={0.8}
+                activeOpacity={0.9}
             >
                 <LinearGradient
-                    colors={['#8e44ad', '#6a0dad']}
+                    colors={['#8B5CF6', '#7C3AED']}
                     style={styles.fabGradient}
                 >
-                    <Ionicons name="add" size={24} color="#ffffff" />
+                    <Ionicons name="add" size={28} color="#ffffff" />
                 </LinearGradient>
             </TouchableOpacity>
         </View>
@@ -357,161 +404,322 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#FAFAF9',
     },
     header: {
         overflow: 'hidden',
     },
     headerGradient: {
         flex: 1,
+        position: 'relative',
+    },
+    headerDecorations: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    headerCircle: {
+        position: 'absolute',
+        width: 150,
+        height: 150,
+        borderRadius: 75,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        top: -75,
+        right: -30,
+    },
+    headerShape: {
+        position: 'absolute',
+        width: 80,
+        height: 80,
+        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        transform: [{ rotate: '45deg' }],
+        bottom: -40,
+        left: width - 60,
+    },
+    headerContent: {
+        flex: 1,
         justifyContent: 'flex-end',
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingBottom: 20,
+        zIndex: 1,
     },
     headerTitle: {
-        fontWeight: 'bold',
-        color: '#ffffff',
+        fontSize: 28,
+        fontWeight: '800',
+        color: 'white',
+        marginBottom: 2,
+    },
+    headerSubtitle: {
+        fontSize: 14,
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontWeight: '500',
     },
     filterContainer: {
-        flexDirection: 'row',
-        paddingHorizontal: 15,
-        paddingVertical: 12,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        borderBottomColor: '#F3F4F6',
     },
-    filterButton: {
-        paddingHorizontal: 12,
+    filterScrollWrapper: {
+        flexDirection: 'row',
+        paddingHorizontal: 24,
+        gap: 8,
+    },
+    filterChip: {
+        paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
-        marginRight: 8,
-        backgroundColor: '#f4f4f4',
+        backgroundColor: '#F9FAFB',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        position: 'relative',
+        overflow: 'hidden',
     },
-    activeFilterButton: {
-        backgroundColor: '#6a0dad',
+    activeFilterChip: {
+        backgroundColor: 'transparent',
+    },
+    filterChipGradient: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
     filterText: {
         fontSize: 14,
-        color: '#666',
-        fontWeight: '500',
-    },
-    activeFilterText: {
-        color: '#ffffff',
+        color: '#6B7280',
         fontWeight: '600',
     },
+    activeFilterText: {
+        color: '#FFFFFF',
+    },
+    filterBadge: {
+        backgroundColor: '#E5E7EB',
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 6,
+    },
+    activeFilterBadge: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    filterBadgeText: {
+        fontSize: 12,
+        color: '#6B7280',
+        fontWeight: '600',
+    },
+    activeFilterBadgeText: {
+        color: '#FFFFFF',
+    },
     listContainer: {
-        padding: 15,
-        paddingTop: 10,
+        padding: 24,
+        paddingTop: 16,
     },
     emptyListContainer: {
         flex: 1,
         justifyContent: 'center',
-        alignItems: 'center',
+    },
+    cardWrapper: {
+        marginBottom: 20,
     },
     card: {
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
         overflow: 'hidden',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-        elevation: 4,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 6,
     },
-    cardImageContainer: {
+    cardHeader: {
         position: 'relative',
+        height: 120,
     },
     cardImage: {
         width: '100%',
-        height: 140,
+        height: '100%',
     },
     cardImagePlaceholder: {
         width: '100%',
-        height: 140,
+        height: '100%',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    statusBadge: {
+    cardDecoration: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        width: 60,
+        height: 60,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderBottomLeftRadius: 30,
+    },
+    statusBadgeContainer: {
         position: 'absolute',
         top: 12,
-        right: 12,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 20,
+        left: 12,
     },
-    activeBadge: {
-        backgroundColor: '#28a745',
-    },
-    completedBadge: {
-        backgroundColor: '#6c757d',
-    },
-    cancelledBadge: {
-        backgroundColor: '#dc3545',
-    },
-    draftBadge: {
-        backgroundColor: '#ffc107',
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
     },
     statusText: {
-        fontSize: 11,
-        color: '#ffffff',
-        fontWeight: 'bold',
+        fontSize: 12,
+        color: '#FFFFFF',
+        fontWeight: '700',
     },
     cardContent: {
-        padding: 16,
+        padding: 20,
     },
     cardTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 12,
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 16,
+        lineHeight: 24,
     },
-    cardInfo: {
-        marginBottom: 10,
+    cardDetails: {
+        gap: 10,
     },
-    infoItem: {
+    detailRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 8,
     },
-    infoText: {
+    iconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#F9FAFB',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    detailText: {
         fontSize: 14,
-        color: '#666',
-        marginLeft: 8,
+        color: '#6B7280',
+        fontWeight: '500',
+        flex: 1,
     },
     paymentContainer: {
-        marginTop: 8,
+        marginTop: 16,
     },
-    paymentInfo: {
+    paymentBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 20,
+        alignSelf: 'flex-start',
     },
     paymentText: {
         fontSize: 14,
-        color: '#ffffff',
+        color: '#FFFFFF',
         fontWeight: '600',
-        marginLeft: 8,
+        marginLeft: 6,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        paddingHorizontal: 40,
+    },
+    emptyIllustration: {
+        position: 'relative',
+        marginBottom: 32,
+    },
+    emptyIconGradient: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emptyDecorations: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    emptyDot1: {
+        position: 'absolute',
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#06B6D4',
+        top: 10,
+        right: 15,
+    },
+    emptyDot2: {
+        position: 'absolute',
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#F59E0B',
+        bottom: 15,
+        right: 10,
+    },
+    emptyDot3: {
+        position: 'absolute',
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#EF4444',
+        top: 20,
+        left: 10,
+    },
+    emptyTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#111827',
+        marginBottom: 8,
+    },
+    emptySubtitle: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+        lineHeight: 24,
+        marginBottom: 32,
+    },
+    createButton: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        shadowColor: '#8B5CF6',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    createButtonGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingVertical: 16,
+        gap: 8,
+    },
+    createButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
     },
     fab: {
         position: 'absolute',
-        right: 20,
-        bottom: 20,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
+        right: 24,
+        bottom: 24,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
         overflow: 'hidden',
+        shadowColor: '#8B5CF6',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 8,
     },
     fabGradient: {
         width: '100%',
@@ -520,69 +728,33 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     errorContainer: {
+        margin: 24,
+        marginTop: 16,
+    },
+    errorContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#ffebee',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        margin: 15,
-        borderRadius: 8,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        borderRadius: 12,
+        padding: 16,
     },
     errorText: {
-        color: '#ff4646',
+        color: '#EF4444',
         marginLeft: 8,
         fontWeight: '500',
+        flex: 1,
     },
-    loaderContainer: {
+    loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        gap: 16,
     },
-    loaderText: {
-        marginTop: 10,
-        color: '#6a0dad',
+    loadingText: {
+        color: '#8B5CF6',
         fontSize: 16,
-    },
-    emptyContainer: {
-        alignItems: 'center',
-        paddingHorizontal: 30,
-    },
-    emptyIconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        overflow: 'hidden',
-        marginBottom: 20,
-    },
-    emptyIconGradient: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    emptyTitle: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 12,
-    },
-    emptySubtitle: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: 24,
-        marginBottom: 25,
-    },
-    emptyButton: {
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        backgroundColor: '#6a0dad',
-        borderRadius: 30,
-    },
-    emptyButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-        fontSize: 16,
+        fontWeight: '500',
     },
 });
