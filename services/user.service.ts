@@ -1,13 +1,14 @@
 import { API_URL } from "@/constants";
+import { UserGetDtoResponse } from "@/types/profile";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 class UserService {
     constructor() { }
 
-    async getUserProfile() {
+    async getUserProfile(): Promise<UserGetDtoResponse> {
         try {
 
-            const userToken = AsyncStorage.getItem('userToken');
+            const userToken = await AsyncStorage.getItem('userToken');
             if (!userToken) {
                 throw new Error('No authentication token found');
             }
@@ -64,6 +65,36 @@ class UserService {
             return userId;
         } catch (error) {
             console.error('Error fetching user ID:', error);
+            throw error;
+        }
+    }
+
+    async updateUserProfile(token: string, userData: {
+        name?: string;
+        email?: string;
+        phone?: string;
+        password?: string;
+        newPassword?: string;
+        repeatNewPassword?: string;
+    }): Promise<any> {
+        try {
+            const response = await fetch(`${API_URL}/user/update`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(userData),
+            });
+
+            if (!response.ok) {
+                throw new Error('Error al actualizar perfil');
+            }
+
+            return response.json();
+        } catch (error) {
+            console.error('Error al actualizar perfil:', error);
             throw error;
         }
     }

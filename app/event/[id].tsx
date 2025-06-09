@@ -507,29 +507,8 @@ export default function EventDetailScreen() {
 
                 {/* Action buttons */}
                 <View style={styles.actionSection}>
-                    <TouchableOpacity
-                        style={styles.primaryActionButton}
-                        onPress={() => router.push(`/event/${event._id.toString()}/dashboard`)}
-                        activeOpacity={0.9}
-                    >
-                        <LinearGradient
-                            colors={['#8B5CF6', '#7C3AED']}
-                            style={styles.primaryActionGradient}
-                        >
-                            <Ionicons name="stats-chart-outline" size={20} color="white" />
-                            <Text style={styles.primaryActionText}>Ver Dashboard</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
 
                     <View style={styles.secondaryActions}>
-                        <TouchableOpacity
-                            style={styles.secondaryActionButton}
-                            onPress={() => router.push(`/event/${event._id.toString()}/guests`)}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="people-outline" size={20} color="#8B5CF6" />
-                            <Text style={styles.secondaryActionText}>Gestionar Invitados</Text>
-                        </TouchableOpacity>
 
                         {editableEvent.requiresPayment && (
                             <TouchableOpacity
@@ -558,8 +537,8 @@ export default function EventDetailScreen() {
                                 }}
                                 activeOpacity={0.8}
                             >
-                                <Ionicons name="card-outline" size={20} color="#8B5CF6" />
-                                <Text style={styles.secondaryActionText}>Enlace de Pago</Text>
+                                <Ionicons name="card-outline" size={20} color="#FFF" />
+                                <Text style={styles.secondaryActionText}>Generar Enlace de Pago</Text>
                             </TouchableOpacity>
                         )}
                     </View>
@@ -1140,7 +1119,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#8B5CF6',
         borderRadius: 12,
         paddingVertical: 14,
         gap: 6,
@@ -1151,8 +1130,8 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     secondaryActionText: {
-        color: '#8B5CF6',
-        fontSize: 14,
+        color: '#FFF',
+        fontSize: 18,
         fontWeight: '600',
     },
 

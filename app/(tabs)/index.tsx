@@ -178,7 +178,7 @@ export default function HomeScreen() {
               <Text style={styles.actionCardSubtitle}>Crea y gestiona</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={styles.actionCard}
               onPress={handleJoinEventPress}
               activeOpacity={0.9}
@@ -193,7 +193,7 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.actionCardTitle}>Unirme</Text>
               <Text style={styles.actionCardSubtitle}>A eventos existentes</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
 
           {/* Botones secundarios */}
